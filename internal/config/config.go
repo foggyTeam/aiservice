@@ -54,11 +54,13 @@ func LoadFromEnv() *Config {
 			Env:  getEnv("ENV", "dev"),
 		},
 		LLM: LLMProviderConfig{
-			Provider: getEnv("LLM_PROVIDER", "openai"),
-			APIKey:   getEnv("LLM_API_KEY", ""),
-			BaseURL:  getEnv("LLM_BASE_URL", "https://api.openai.com/v1"),
-			Model:    getEnv("LLM_MODEL", "gpt-4-turbo"),
-			Timeout:  getDurationEnv("LLM_TIMEOUT", 20*time.Second),
+			// Provider: getEnv("LLM_PROVIDER", "openai"),
+			// APIKey:   getEnv("LLM_API_KEY", ""),
+			// BaseURL:  getEnv("LLM_BASE_URL", "https://api.openai.com/v1"),
+			// Model:    getEnv("LLM_MODEL", "gpt-4-turbo"),
+			// Timeout:  getDurationEnv("LLM_TIMEOUT", 20*time.Second),
+			Provider: getEnv("LLM_PROVIDER", "gemini"),
+			APIKey:   getEnv("GEMINI_API_KEY", ""),
 		},
 		OCR: OCRProviderConfig{
 			Provider: getEnv("OCR_PROVIDER", "azure"),

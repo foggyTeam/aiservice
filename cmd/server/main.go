@@ -16,6 +16,7 @@ import (
 	"github.com/aiservice/internal/config"
 	"github.com/aiservice/internal/handlers"
 	"github.com/aiservice/internal/providers"
+	"github.com/aiservice/internal/providers/gemini"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/storage"
@@ -106,11 +107,15 @@ func initINCRecognizers(cfg *config.Config, logger *log.Logger) providers.InkRec
 func initLLMProviders(cfg *config.Config, logger *log.Logger) providers.LLMClient {
 	switch cfg.LLM.Provider {
 	case "openai":
+		// TODO вынести в отдельный файл
 		logger.Println("Using OpenAI LLM")
 		return providers.NewOpenAIClient(cfg.LLM)
 	case "qwen":
 		logger.Println("Using Qwen LLM")
 		return providers.NewQwenClient(cfg.LLM)
+	case "gemini":
+		logger.Println("Using Gemini LLM")
+		return gemini.NewGeminiClient(cfg.LLM, logger)
 	default:
 		logger.Println("Using Stub LLM Client (dev mode)")
 		return &providers.StubLLMClient{}

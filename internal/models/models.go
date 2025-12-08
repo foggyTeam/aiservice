@@ -11,6 +11,7 @@ type AnalyzeRequest struct {
 	Context     map[string]any  `json:"context,omitempty"`
 	CallbackURL string          `json:"callback_url,omitempty"`
 	RequestID   string          `json:"request_id,omitempty"`
+	Type        string          `json:"type" validate:"required"`
 }
 
 type InkInput struct {
