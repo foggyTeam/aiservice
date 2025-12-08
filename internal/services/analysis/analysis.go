@@ -89,18 +89,12 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 }
 
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
-	inputType, err := s.detectInputType(req.Input) // TODO переделать получение типа запроса
-	if err != nil {
-		return models.AnalyzeResponse{}, fmt.Errorf("invalid input: %w", err)
-	}
-
-	transcription, err := s.transcribe(ctx, inputType, req.Input)
+	transcription, err := s.transcribe(ctx, req.Type, req.Input)
 	if err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("transcription failed: %w", err)
 	}
 
 	contextData := s.buildContextData(req.Context)
-
 	resp, err := s.llm.Analyze(ctx, transcription.Text, contextData)
 	if err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("llm analysis failed: %w", err)
@@ -114,19 +108,9 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 	return resp, nil
 }
 
-func (s *AnalysisService) detectInputType(raw json.RawMessage) (string, error) {
-	var peek map[string]any
-	if err := json.Unmarshal(raw, &peek); err != nil {
-		return "", err
-	}
-	if t, ok := peek["type"].(string); ok && t != "" {
-		return t, nil
-	}
-	return "", fmt.Errorf("input type not specified")
-}
-
 func (s *AnalysisService) transcribe(ctx context.Context, inputType string, raw json.RawMessage) (models.TranscriptionResult, error) {
 	switch inputType {
+	// TODO enum, не зыбать и в модели использовать enum
 	case "ink":
 		var ink models.InkInput
 		if err := json.Unmarshal(raw, &ink); err != nil {
