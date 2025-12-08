@@ -26,32 +26,8 @@ func main() {
 
 	logger := log.New(os.Stdout, "[aiservice] ", log.LstdFlags|log.Lshortfile)
 
-	var inkRecognizer providers.InkRecognizer
-	var llmClient providers.LLMClient
-
-	switch cfg.OCR.Provider {
-	case "azure":
-		inkRecognizer = providers.NewAzureInkRecognizer(cfg.OCR)
-		logger.Println("Using Azure Ink Recognizer")
-	case "myscript":
-		inkRecognizer = providers.NewMyScriptRecognizer(cfg.OCR)
-		logger.Println("Using MyScript Recognizer")
-	default:
-		inkRecognizer = &providers.StubInkRecognizer{}
-		logger.Println("Using Stub Ink Recognizer (dev mode)")
-	}
-
-	switch cfg.LLM.Provider {
-	case "openai":
-		llmClient = providers.NewOpenAIClient(cfg.LLM)
-		logger.Println("Using OpenAI LLM")
-	case "qwen":
-		llmClient = providers.NewQwenClient(cfg.LLM)
-		logger.Println("Using Qwen LLM")
-	default:
-		llmClient = &providers.StubLLMClient{}
-		logger.Println("Using Stub LLM Client (dev mode)")
-	}
+	inkRecognizer := initINCRecognizers(cfg, logger)
+	llmClient := initLLMProviders(cfg, logger)
 
 	analysisService := analysis.NewAnalysisService(inkRecognizer, llmClient, logger)
 	jobStorage := storage.NewInMemoryJobStorage()
@@ -86,6 +62,10 @@ func main() {
 	e.POST("/analyze", analyzeHandler.Handle)
 	e.GET("/jobs/:id", analyzeHandler.GetJobStatus)
 
+	startServer(logger, cfg, jobQueueService, e)
+}
+
+func startServer(logger *log.Logger, cfg *config.Config, jobQueueService *jobservice.JobQueueService, e *echo.Echo) {
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -106,5 +86,33 @@ func main() {
 
 	if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
 		logger.Fatalf("Server error: %v", err)
+	}
+}
+
+func initINCRecognizers(cfg *config.Config, logger *log.Logger) providers.InkRecognizer {
+	switch cfg.OCR.Provider {
+	case "azure":
+		logger.Println("Using Azure Ink Recognizer")
+		return providers.NewAzureInkRecognizer(cfg.OCR)
+	case "myscript":
+		logger.Println("Using MyScript Recognizer")
+		return providers.NewMyScriptRecognizer(cfg.OCR)
+	default:
+		logger.Println("Using Stub Ink Recognizer (dev mode)")
+		return &providers.StubInkRecognizer{}
+	}
+}
+
+func initLLMProviders(cfg *config.Config, logger *log.Logger) providers.LLMClient {
+	switch cfg.LLM.Provider {
+	case "openai":
+		logger.Println("Using OpenAI LLM")
+		return providers.NewOpenAIClient(cfg.LLM)
+	case "qwen":
+		logger.Println("Using Qwen LLM")
+		return providers.NewQwenClient(cfg.LLM)
+	default:
+		logger.Println("Using Stub LLM Client (dev mode)")
+		return &providers.StubLLMClient{}
 	}
 }
