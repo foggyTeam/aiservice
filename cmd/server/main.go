@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/aiservice/internal/config"
 	"github.com/aiservice/internal/handlers"
+	"github.com/aiservice/internal/log"
 	"github.com/aiservice/internal/providers"
 	"github.com/aiservice/internal/providers/gemini"
 	analysis "github.com/aiservice/internal/services/analysis"
@@ -25,18 +26,17 @@ import (
 func main() {
 	cfg := config.LoadFromEnv()
 
-	logger := log.New(os.Stdout, "[aiservice] ", log.LstdFlags|log.Lshortfile)
+	_ = log.SetupJsonLogger()
 
-	inkRecognizer := initINCRecognizers(cfg, logger)
-	llmClient := initLLMProviders(cfg, logger)
+	inkRecognizer := initINCRecognizers(cfg)
+	llmClient := initLLMProviders(cfg)
 
-	analysisService := analysis.NewAnalysisService(inkRecognizer, llmClient, logger)
+	analysisService := analysis.NewAnalysisService(cfg.Timeouts.SyncProcess, inkRecognizer, llmClient)
 	jobStorage := storage.NewInMemoryJobStorage()
 	jobQueueService := jobservice.NewJobQueueService(
 		cfg.Job.QueueSize,
 		cfg.Job.WorkerCount,
 		jobStorage,
-		logger,
 		analysisService,
 	)
 
@@ -56,68 +56,67 @@ func main() {
 		analysisService,
 		jobQueueService,
 		cfg.Timeouts.SyncProcess,
-		logger,
 	)
 
 	e.GET("/health", handlers.HealthHandler)
 	e.POST("/analyze", analyzeHandler.Handle)
 	e.GET("/jobs/:id", analyzeHandler.GetJobStatus)
 
-	startServer(logger, cfg, jobQueueService, e)
+	startServer(cfg, jobQueueService, e)
 }
 
-func startServer(logger *log.Logger, cfg *config.Config, jobQueueService *jobservice.JobQueueService, e *echo.Echo) {
+func startServer(cfg *config.Config, jobQueueService *jobservice.JobQueueService, e *echo.Echo) {
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		logger.Println("Shutting down...")
+		slog.Info("shutting down...")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		jobQueueService.Shutdown()
 		if err := e.Shutdown(ctx); err != nil {
-			logger.Printf("Shutdown error: %v", err)
+			slog.Error("shutdown error:", "err", err)
 		}
 	}()
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
-	logger.Printf("Starting server on %s (env: %s)", addr, cfg.Server.Env)
+	slog.Info("starting server", "addr", addr, "env", cfg.Server.Env)
 
 	if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
-		logger.Fatalf("Server error: %v", err)
+		slog.Error("server error:", "err", err)
 	}
 }
 
-func initINCRecognizers(cfg *config.Config, logger *log.Logger) providers.InkRecognizer {
+func initINCRecognizers(cfg *config.Config) providers.InkRecognizer {
 	switch cfg.OCR.Provider {
 	case "azure":
-		logger.Println("Using Azure Ink Recognizer")
+		slog.Info("Using Azure Ink Recognizer")
 		return providers.NewAzureInkRecognizer(cfg.OCR)
 	case "myscript":
-		logger.Println("Using MyScript Recognizer")
+		slog.Info("Using MyScript Recognizer")
 		return providers.NewMyScriptRecognizer(cfg.OCR)
 	default:
-		logger.Println("Using Stub Ink Recognizer (dev mode)")
+		slog.Info("Using Stub Ink Recognizer (dev mode)")
 		return &providers.StubInkRecognizer{}
 	}
 }
 
-func initLLMProviders(cfg *config.Config, logger *log.Logger) providers.LLMClient {
+func initLLMProviders(cfg *config.Config) providers.LLMClient {
 	switch cfg.LLM.Provider {
 	case "openai":
 		// TODO вынести в отдельный файл
-		logger.Println("Using OpenAI LLM")
+		slog.Info("Using OpenAI LLM")
 		return providers.NewOpenAIClient(cfg.LLM)
 	case "qwen":
-		logger.Println("Using Qwen LLM")
+		slog.Info("Using Qwen LLM")
 		return providers.NewQwenClient(cfg.LLM)
 	case "gemini":
-		logger.Println("Using Gemini LLM")
-		return gemini.NewGeminiClient(cfg.LLM, logger)
+		slog.Info("Using Gemini LLM")
+		return gemini.NewGeminiClient(cfg.LLM)
 	default:
-		logger.Println("Using Stub LLM Client (dev mode)")
+		slog.Info("Using Stub LLM Client (dev mode)")
 		return &providers.StubLLMClient{}
 	}
 }
