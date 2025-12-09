@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/aiservice/internal/config"
@@ -16,14 +16,12 @@ import (
 
 type GeminiClient struct {
 	cfg    config.LLMProviderConfig
-	log    *log.Logger
 	client *http.Client
 }
 
-func NewGeminiClient(cfg config.LLMProviderConfig, logger *log.Logger) *GeminiClient {
+func NewGeminiClient(cfg config.LLMProviderConfig) *GeminiClient {
 	return &GeminiClient{
 		cfg: cfg,
-		log: logger,
 		client: &http.Client{
 			Timeout: cfg.Timeout,
 		},
@@ -54,9 +52,7 @@ func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData s
 		prompt := fmt.Sprintf("Generate a friendly greeting for %s.", input.Name)
 
 		// Generate structured recipe data using the same schema
-		recipe, _, err := genkit.GenerateData[Hello](ctx, gkit,
-			ai.WithPrompt(prompt),
-		)
+		recipe, _, err := genkit.GenerateData[Hello](ctx, gkit, ai.WithPrompt(prompt))
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate recipe: %w", err)
 		}
@@ -67,11 +63,12 @@ func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData s
 	// Run the flow once to test it
 	recipe, err := recipeGeneratorFlow.Run(ctx, &Hello{Name: "Alice"})
 	if err != nil {
-		g.log.Fatalf("could not generate recipe: %v", err)
+		slog.Error("could not generate recipe:", "err", err)
+		return models.AnalyzeResponse{}, err
 	}
 
 	recipeJSON, _ := json.MarshalIndent(recipe, "", "  ")
-	g.log.Println("Sample recipe generated:")
-	g.log.Println(string(recipeJSON))
+	slog.Info("Sample recipe generated:")
+	slog.Info(string(recipeJSON))
 	return models.AnalyzeResponse{}, nil
 }

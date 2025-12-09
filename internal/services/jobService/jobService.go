@@ -3,7 +3,7 @@ package jobservice
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -14,7 +14,6 @@ type JobQueueService struct {
 	queue   chan models.Job
 	wg      sync.WaitGroup
 	storage JobStorage
-	log     *log.Logger
 	request Processor
 }
 
@@ -37,11 +36,10 @@ func NewJob(req models.AnalyzeRequest) models.Job {
 	}
 }
 
-func NewJobQueueService(bufSize, workers int, storage JobStorage, logger *log.Logger, p Processor) *JobQueueService {
+func NewJobQueueService(bufSize, workers int, storage JobStorage, p Processor) *JobQueueService {
 	q := &JobQueueService{
 		queue:   make(chan models.Job, bufSize),
 		storage: storage,
-		log:     logger,
 		request: p,
 	}
 	for range workers {
@@ -75,7 +73,7 @@ func (q *JobQueueService) worker() {
 }
 
 func (q *JobQueueService) processJob(job models.Job) {
-	q.log.Printf("[job %s] starting processing", job.ID)
+	slog.Info("job starting processing", "id", job.ID)
 
 	job.Status = models.JobStatusRunning
 	_ = q.storage.Update(job)
@@ -86,7 +84,7 @@ func (q *JobQueueService) processJob(job models.Job) {
 	resp, err := q.request.Process(ctx, job.Request)
 
 	if err != nil {
-		q.log.Printf("[job %s] error: %v", job.ID, err)
+		slog.Info("[job %s] error: %v", job.ID, err)
 		job.Status = models.JobStatusFailed
 		_ = q.storage.Update(job)
 		q.deliverCallback(job, map[string]any{
@@ -103,7 +101,7 @@ func (q *JobQueueService) processJob(job models.Job) {
 		"result": resp,
 	})
 
-	q.log.Printf("[job %s] completed", job.ID)
+	slog.Info("job completed", "id", job.ID)
 }
 
 func (q *JobQueueService) deliverCallback(job models.Job, payload map[string]any) {

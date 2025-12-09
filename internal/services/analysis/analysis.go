@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/aiservice/internal/models"
@@ -18,7 +18,6 @@ const (
 type AnalysisService struct {
 	ink     InkRecognizer
 	llm     LLMClient
-	log     *log.Logger
 	timeout time.Duration
 	db      jobservice.JobQueueService
 }
@@ -32,11 +31,11 @@ type LLMClient interface {
 	Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error)
 }
 
-func NewAnalysisService(ink InkRecognizer, llm LLMClient, logger *log.Logger) *AnalysisService {
+func NewAnalysisService(timeout time.Duration, ink InkRecognizer, llm LLMClient) *AnalysisService {
 	return &AnalysisService{
-		ink: ink,
-		llm: llm,
-		log: logger,
+		timeout: timeout,
+		ink:     ink,
+		llm:     llm,
 	}
 }
 
@@ -68,7 +67,7 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 
 		job := jobservice.NewJob(req)
 		if err := s.db.Enqueue(job); err != nil {
-			s.log.Printf("enqueue error: %v", err)
+			slog.Warn("enqueue error: %s", slog.Any("err", err))
 			return models.AnalyzeResponse{}, fmt.Errorf("job queue is full, try again later")
 		}
 
@@ -80,7 +79,7 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 		}
 
 	case err := <-errCh:
-		s.log.Printf("process error: %v", err)
+		slog.Warn("process error: %s", slog.Any("err", err))
 		return models.AnalyzeResponse{}, fmt.Errorf("failed to process request: %w", err)
 
 	case resp := <-resultCh:

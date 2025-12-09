@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -17,20 +17,17 @@ type AnalyzeHandler struct {
 	service     *analysis.AnalysisService
 	jobQueue    *jobservice.JobQueueService
 	syncTimeout time.Duration
-	log         *log.Logger
 }
 
 func NewAnalyzeHandler(
 	service *analysis.AnalysisService,
 	jobQueue *jobservice.JobQueueService,
 	syncTimeout time.Duration,
-	logger *log.Logger,
 ) *AnalyzeHandler {
 	return &AnalyzeHandler{
 		service:     service,
 		jobQueue:    jobQueue,
 		syncTimeout: syncTimeout,
-		log:         logger,
 	}
 }
 
@@ -38,7 +35,7 @@ func (h *AnalyzeHandler) Handle(c echo.Context) error {
 	var req models.AnalyzeRequest
 
 	if err := c.Bind(&req); err != nil {
-		h.log.Printf("bind error: %v", err)
+		slog.Error("bind error:", "err", err)
 		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Code:    "INVALID_REQUEST",
 			Message: "Invalid JSON",
@@ -55,7 +52,7 @@ func (h *AnalyzeHandler) Handle(c echo.Context) error {
 
 	resp, err := h.service.StartJob(c.Request().Context(), req)
 	if err != nil {
-		h.log.Printf("analysis error: %v", err)
+		slog.Error("analysis error:", "err", err)
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "ANALYSIS_ERROR",
 			Message: "Failed to analyze input",

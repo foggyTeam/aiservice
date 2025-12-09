@@ -60,7 +60,7 @@ func LoadFromEnv() *Config {
 			// Model:    getEnv("LLM_MODEL", "gpt-4-turbo"),
 			// Timeout:  getDurationEnv("LLM_TIMEOUT", 20*time.Second),
 			Provider: getEnv("LLM_PROVIDER", "gemini"),
-			APIKey:   getEnv("GEMINI_API_KEY", ""),
+			APIKey:   getEnv("GEMINI_API_KEY", "AIzaSyCE_VhOAE4qCkXpxbyzWQfMLDJrCcwEa7Q"),
 		},
 		OCR: OCRProviderConfig{
 			Provider: getEnv("OCR_PROVIDER", "azure"),
@@ -75,9 +75,9 @@ func LoadFromEnv() *Config {
 			RetryBackoff: getDurationEnv("JOB_RETRY_BACKOFF", 2*time.Second),
 		},
 		Timeouts: TimeoutsConfig{
-			SyncProcess:  getDurationEnv("TIMEOUT_SYNC_PROCESS", 4*time.Second),
-			InkRecognize: getDurationEnv("TIMEOUT_INK_RECOGNIZE", 8*time.Second),
-			LLMRequest:   getDurationEnv("TIMEOUT_LLM_REQUEST", 20*time.Second),
+			SyncProcess:  getDurationEnv("TIMEOUT_SYNC_PROCESS", 20*time.Minute),
+			InkRecognize: getDurationEnv("TIMEOUT_INK_RECOGNIZE", 20*time.Minute),
+			LLMRequest:   getDurationEnv("TIMEOUT_LLM_REQUEST", 20*time.Minute),
 		},
 	}
 }
