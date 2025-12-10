@@ -17,7 +17,10 @@ import (
 	"github.com/aiservice/internal/handlers"
 	"github.com/aiservice/internal/log"
 	"github.com/aiservice/internal/providers"
+	"github.com/aiservice/internal/providers/azure"
 	"github.com/aiservice/internal/providers/gemini"
+	"github.com/aiservice/internal/providers/openai"
+	"github.com/aiservice/internal/providers/qwen"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/storage"
@@ -93,13 +96,12 @@ func initINCRecognizers(cfg *config.Config) providers.InkRecognizer {
 	switch cfg.OCR.Provider {
 	case "azure":
 		slog.Info("Using Azure Ink Recognizer")
-		return providers.NewAzureInkRecognizer(cfg.OCR)
+		return azure.NewAzureInkRecognizer(cfg.OCR)
 	case "myscript":
 		slog.Info("Using MyScript Recognizer")
-		return providers.NewMyScriptRecognizer(cfg.OCR)
+		return azure.NewMyScriptRecognizer(cfg.OCR)
 	default:
-		slog.Info("Using Stub Ink Recognizer (dev mode)")
-		return &providers.StubInkRecognizer{}
+		panic("no providers")
 	}
 }
 
@@ -108,15 +110,14 @@ func initLLMProviders(cfg *config.Config) providers.LLMClient {
 	case "openai":
 		// TODO вынести в отдельный файл
 		slog.Info("Using OpenAI LLM")
-		return providers.NewOpenAIClient(cfg.LLM)
+		return openai.NewOpenAIClient(cfg.LLM)
 	case "qwen":
 		slog.Info("Using Qwen LLM")
-		return providers.NewQwenClient(cfg.LLM)
+		return qwen.NewQwenClient(cfg.LLM)
 	case "gemini":
 		slog.Info("Using Gemini LLM")
 		return gemini.NewGeminiClient(cfg.LLM)
 	default:
-		slog.Info("Using Stub LLM Client (dev mode)")
-		return &providers.StubLLMClient{}
+		panic("no providers")
 	}
 }

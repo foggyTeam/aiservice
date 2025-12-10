@@ -15,6 +15,12 @@ const (
 	MaxStrokesPoints = 20000
 )
 
+const (
+	ink   = "ink"
+	image = "image"
+	text  = "text"
+)
+
 type AnalysisService struct {
 	ink     InkRecognizer
 	llm     LLMClient
@@ -87,8 +93,10 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 	}
 }
 
+// TODO нужно сделать пайпплайн по процессингу запросов
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
-	transcription, err := s.transcribe(ctx, req.Type, req.Input)
+
+	transcription, err := s.transcribe(ctx, req)
 	if err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("transcription failed: %w", err)
 	}
@@ -107,12 +115,11 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 	return resp, nil
 }
 
-func (s *AnalysisService) transcribe(ctx context.Context, inputType string, raw json.RawMessage) (models.TranscriptionResult, error) {
-	switch inputType {
-	// TODO enum, не зыбать и в модели использовать enum
-	case "ink":
+func (s *AnalysisService) transcribe(ctx context.Context, req models.AnalyzeRequest) (models.TranscriptionResult, error) {
+	switch req.Type {
+	case ink:
 		var ink models.InkInput
-		if err := json.Unmarshal(raw, &ink); err != nil {
+		if err := json.Unmarshal(req.Input, &ink); err != nil {
 			return models.TranscriptionResult{}, fmt.Errorf("invalid ink input: %w", err)
 		}
 		if err := s.validateInkInput(ink); err != nil {
@@ -120,16 +127,16 @@ func (s *AnalysisService) transcribe(ctx context.Context, inputType string, raw 
 		}
 		return s.ink.RecognizeInk(ctx, ink)
 
-	case "image":
+	case image:
 		var img models.ImageInput
-		if err := json.Unmarshal(raw, &img); err != nil {
+		if err := json.Unmarshal(req.Input, &img); err != nil {
 			return models.TranscriptionResult{}, fmt.Errorf("invalid image input: %w", err)
 		}
 		return s.ink.RecognizeImage(ctx, img)
 
-	case "text":
+	case text:
 		var txt models.TextInput
-		if err := json.Unmarshal(raw, &txt); err != nil {
+		if err := json.Unmarshal(req.Input, &txt); err != nil {
 			return models.TranscriptionResult{}, fmt.Errorf("invalid text input: %w", err)
 		}
 		return models.TranscriptionResult{
@@ -138,7 +145,7 @@ func (s *AnalysisService) transcribe(ctx context.Context, inputType string, raw 
 		}, nil
 
 	default:
-		return models.TranscriptionResult{}, fmt.Errorf("unsupported input type: %s", inputType)
+		return models.TranscriptionResult{}, fmt.Errorf("unsupported input type: %s", req.Type)
 	}
 }
 

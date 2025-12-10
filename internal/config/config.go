@@ -60,7 +60,7 @@ func LoadFromEnv() *Config {
 			// Model:    getEnv("LLM_MODEL", "gpt-4-turbo"),
 			// Timeout:  getDurationEnv("LLM_TIMEOUT", 20*time.Second),
 			Provider: getEnv("LLM_PROVIDER", "gemini"),
-			APIKey:   getEnv("GEMINI_API_KEY", "AIzaSyCE_VhOAE4qCkXpxbyzWQfMLDJrCcwEa7Q"),
+			APIKey:   getEnv("GEMINI_API_KEY", ""),
 		},
 		OCR: OCRProviderConfig{
 			Provider: getEnv("OCR_PROVIDER", "azure"),

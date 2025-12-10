@@ -29,9 +29,6 @@ func NewGeminiClient(cfg config.LLMProviderConfig) *GeminiClient {
 }
 
 func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error) {
-	// Implementation for calling Gemini API goes here.
-	// This is a placeholder implementation.
-	// Initialize Genkit with the Google AI plugin
 	gkit := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{APIKey: g.cfg.APIKey}),
 		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
@@ -43,11 +40,6 @@ func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData s
 		Message string `json:"message"`
 	}
 	recipeGeneratorFlow := genkit.DefineFlow(gkit, "helloFoo", func(ctx context.Context, input *Hello) (*Hello, error) {
-		// Create a prompt based on the input
-		// dietaryRestrictions := input.DietaryRestrictions
-		// if dietaryRestrictions == "" {
-		// 	dietaryRestrictions = "none"
-		// }
 
 		prompt := fmt.Sprintf("Generate a friendly greeting for %s.", input.Name)
 
