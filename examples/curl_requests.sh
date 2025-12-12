@@ -7,18 +7,39 @@ BASE_URL="http://localhost:8080"
 # ============================================
 # 1. TEXT INPUT - Simple Request
 # ============================================
-echo "=== Test 1: Text Input ==="
+# echo "=== Test 1: Text Input ==="
+# curl -X POST "$BASE_URL/analyze" \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "board_id": "board_123",
+#     "user_id": "user_456",
+#     "type": "text",
+#     "input": {
+#       "type": "text",
+#       "text": "Create a timeline from 2020 to 2025"
+#     }
+#   }' | jq
+
+# exit 0
+
+
+echo -e "\n=== Test 2: Image Input (URL) ==="
 curl -X POST "$BASE_URL/analyze" \
   -H "Content-Type: application/json" \
   -d '{
     "board_id": "board_123",
     "user_id": "user_456",
-    "type": "text",
+    "type": "image",
     "input": {
-      "type": "text",
-      "text": "Create a timeline from 2020 to 2025"
+      "type": "image",
+      "image_url": "https://i.pinimg.com/736x/e8/a3/a5/e8a3a50ae88bc61124ba120d0643bd9a.jpg",
+      "meta": {
+        "format": "png",
+        "width": 800,
+        "height": 600
+      }
     }
-  }' | jq
+  }' | jq .
 
 exit 0
 # ============================================
