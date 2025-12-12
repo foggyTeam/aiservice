@@ -19,10 +19,8 @@ type OpenAIClient struct {
 
 func NewOpenAIClient(cfg config.LLMProviderConfig) *OpenAIClient {
 	return &OpenAIClient{
-		cfg: cfg,
-		client: &http.Client{
-			Timeout: cfg.Timeout,
-		},
+		cfg:    cfg,
+		client: &http.Client{Timeout: cfg.Timeout},
 	}
 }
 
@@ -58,6 +56,61 @@ func (c *OpenAIClient) Analyze(ctx context.Context, transcription, contextData s
 	}
 
 	return c.parseResponse(result)
+}
+
+func (c *OpenAIClient) RecognizeImage(ctx context.Context, input models.ImageInput) (models.TranscriptionResult, error) {
+	body := map[string]any{
+		"url": input.ImageURL,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+	req, _ := http.NewRequestWithContext(ctx, "POST", c.cfg.BaseURL+"/recognizeText", bytes.NewReader(bodyBytes))
+	req.Header.Set("Ocp-Apim-Subscription-Key", c.cfg.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return models.TranscriptionResult{}, fmt.Errorf("azure ocr request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return models.TranscriptionResult{}, fmt.Errorf("failed to parse azure ocr response: %w", err)
+	}
+
+	return models.TranscriptionResult{
+		Text:     extractString(result, "recognitionResult", "lines", "0", "text"),
+		Language: "en",
+		Metadata: result,
+	}, nil
+}
+
+func extractString(data map[string]any, keys ...string) string {
+	current := any(data)
+	for _, key := range keys {
+		switch v := current.(type) {
+		case map[string]any:
+			current = v[key]
+		case []any:
+			idx := 0
+			// Try to parse as index
+			if i, err := json.Number(key).Int64(); err == nil {
+				idx = int(i)
+			}
+			if idx < len(v) {
+				current = v[idx]
+			} else {
+				return ""
+			}
+		default:
+			return ""
+		}
+	}
+	if s, ok := current.(string); ok {
+		return s
+	}
+	return ""
 }
 
 func (c *OpenAIClient) buildPrompt(transcription, contextData string) string {

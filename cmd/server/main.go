@@ -100,6 +100,10 @@ func initINCRecognizers(cfg *config.Config) providers.InkRecognizer {
 	case "myscript":
 		slog.Info("Using MyScript Recognizer")
 		return azure.NewMyScriptRecognizer(cfg.OCR)
+
+	case "gemini":
+		slog.Info("Using Gemini LLM")
+		return gemini.NewGeminiClient(cfg.LLM)
 	default:
 		panic("no providers")
 	}

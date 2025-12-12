@@ -63,10 +63,12 @@ func LoadFromEnv() *Config {
 			APIKey:   getEnv("GEMINI_API_KEY", ""),
 		},
 		OCR: OCRProviderConfig{
-			Provider: getEnv("OCR_PROVIDER", "azure"),
-			APIKey:   getEnv("OCR_API_KEY", ""),
-			BaseURL:  getEnv("OCR_BASE_URL", ""),
-			Timeout:  getDurationEnv("OCR_TIMEOUT", 8*time.Second),
+			Provider: getEnv("LLM_PROVIDER", "gemini"),
+			APIKey:   getEnv("GEMINI_API_KEY", ""),
+			// Provider: getEnv("OCR_PROVIDER", "azure"),
+			// APIKey:   getEnv("OCR_API_KEY", ""),
+			// BaseURL:  getEnv("OCR_BASE_URL", ""),
+			// Timeout:  getDurationEnv("OCR_TIMEOUT", 8*time.Second),
 		},
 		Job: JobConfig{
 			QueueSize:    getIntEnv("JOB_QUEUE_SIZE", 100),

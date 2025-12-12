@@ -64,3 +64,28 @@ func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData s
 	slog.Info(string(recipeJSON))
 	return models.AnalyzeResponse{}, nil
 }
+
+func (g *GeminiClient) RecognizeImage(ctx context.Context, input models.ImageInput) (models.TranscriptionResult, error) {
+	gkit := genkit.Init(ctx,
+		genkit.WithPlugins(&googlegenai.GoogleAI{APIKey: g.cfg.APIKey}),
+		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
+	)
+	resp, err := genkit.Generate(ctx, gkit,
+		ai.WithMessages(
+			ai.NewUserMessage(
+				ai.NewTextPart("What do you see in this image?"),
+				ai.NewMediaPart("image/jpeg", input.ImageURL),
+			),
+		))
+	if err != nil {
+		return models.TranscriptionResult{}, fmt.Errorf("gemini image recognition failed: %w", err)
+	}
+	return models.TranscriptionResult{
+		Text:     resp.Message.Text(),
+		Metadata: resp.Message.Metadata,
+	}, nil
+}
+
+func (g *GeminiClient) RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error) {
+	return models.TranscriptionResult{}, fmt.Errorf("gemini does not support ink recognition")
+}

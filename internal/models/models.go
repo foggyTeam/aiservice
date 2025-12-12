@@ -35,6 +35,24 @@ type ImageInput struct {
 	Meta     map[string]any `json:"meta,omitempty"`
 }
 
+// func (i ImageInput) Image() (string, error) {
+// 	if i.ImageURL == "" {
+// 		return "", fmt.Errorf("no image URL provided")
+// 	}
+// 	// resp, err := http.Get(i.ImageURL)
+// 	resp, err := http.Get("https://i.pinimg.com/736x/e8/a3/a5/e8a3a50ae88bc61124ba120d0643bd9a.jpg")
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to fetch image: %w", err)
+// 	}
+// 	defer resp.Body.Close()
+// 	imageBytes, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to read image data: %w", err)
+// 	}
+// 	base64Str := base64.StdEncoding.EncodeToString(imageBytes)
+// 	return base64Str, nil
+// }
+
 type TextInput struct {
 	Type string `json:"type"`
 	Text string `json:"text" validate:"required"`
