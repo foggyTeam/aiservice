@@ -2,42 +2,24 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/aiservice/internal/models"
+	"github.com/aiservice/internal/providers"
 	jobservice "github.com/aiservice/internal/services/jobService"
-)
-
-const (
-	MaxStrokesPoints = 20000
-)
-
-const (
-	ink   = "ink"
-	image = "image"
-	text  = "text"
+	"github.com/aiservice/internal/services/pipeline"
 )
 
 type AnalysisService struct {
-	ink     InkRecognizer
-	llm     LLMClient
+	ink     providers.InkRecognizer
+	llm     providers.LLMClient
 	timeout time.Duration
 	db      jobservice.JobQueueService
 }
 
-type InkRecognizer interface {
-	RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error)
-	RecognizeImage(ctx context.Context, input models.ImageInput) (models.TranscriptionResult, error)
-}
-
-type LLMClient interface {
-	Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error)
-}
-
-func NewAnalysisService(timeout time.Duration, ink InkRecognizer, llm LLMClient) *AnalysisService {
+func NewAnalysisService(timeout time.Duration, ink providers.InkRecognizer, llm providers.LLMClient) *AnalysisService {
 	return &AnalysisService{
 		timeout: timeout,
 		ink:     ink,
@@ -93,80 +75,26 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 	}
 }
 
-// TODO нужно сделать пайпплайн по процессингу запросов
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
+	state := &pipeline.PipelineState{
+		Request:     req,
+		ContextData: pipeline.BuildContextData(req.Context),
+	}
 
-	transcription, err := s.transcribe(ctx, req)
+	p, err := pipeline.BuildPipeline(req.Type, s.ink, s.llm)
 	if err != nil {
-		return models.AnalyzeResponse{}, fmt.Errorf("transcription failed: %w", err)
+		return models.AnalyzeResponse{}, err
 	}
 
-	contextData := s.buildContextData(req.Context)
-	resp, err := s.llm.Analyze(ctx, transcription.Text, contextData)
-	if err != nil {
-		return models.AnalyzeResponse{}, fmt.Errorf("llm analysis failed: %w", err)
+	if err := p.Execute(ctx, state); err != nil {
+		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
 
-	if resp.Metadata == nil {
-		resp.Metadata = make(map[string]any)
+	// attach transcription metadata
+	if state.LLMResp.Metadata == nil {
+		state.LLMResp.Metadata = make(map[string]any)
 	}
-	resp.Metadata["transcription_meta"] = transcription.Metadata
+	state.LLMResp.Metadata["transcription_meta"] = state.Transcription.Metadata
 
-	return resp, nil
-}
-
-func (s *AnalysisService) transcribe(ctx context.Context, req models.AnalyzeRequest) (models.TranscriptionResult, error) {
-	switch req.Type {
-	case ink:
-		var ink models.InkInput
-		if err := json.Unmarshal(req.Input, &ink); err != nil {
-			return models.TranscriptionResult{}, fmt.Errorf("invalid ink input: %w", err)
-		}
-		if err := s.validateInkInput(ink); err != nil {
-			return models.TranscriptionResult{}, err
-		}
-		return s.ink.RecognizeInk(ctx, ink)
-
-	case image:
-		var img models.ImageInput
-		if err := json.Unmarshal(req.Input, &img); err != nil {
-			return models.TranscriptionResult{}, fmt.Errorf("invalid image input: %w", err)
-		}
-		return s.ink.RecognizeImage(ctx, img)
-
-	case text:
-		var txt models.TextInput
-		if err := json.Unmarshal(req.Input, &txt); err != nil {
-			return models.TranscriptionResult{}, fmt.Errorf("invalid text input: %w", err)
-		}
-		return models.TranscriptionResult{
-			Text:     txt.Text,
-			Language: "en",
-		}, nil
-
-	default:
-		return models.TranscriptionResult{}, fmt.Errorf("unsupported input type: %s", req.Type)
-	}
-}
-
-func (s *AnalysisService) validateInkInput(input models.InkInput) error {
-	pointCount := 0
-	for _, stroke := range input.Strokes {
-		pointCount += len(stroke)
-	}
-	if pointCount > MaxStrokesPoints {
-		return fmt.Errorf("too many stroke points: %d (max %d)", pointCount, MaxStrokesPoints)
-	}
-	if pointCount == 0 {
-		return fmt.Errorf("empty strokes")
-	}
-	return nil
-}
-
-func (s *AnalysisService) buildContextData(ctxMap map[string]any) string {
-	if ctxMap == nil {
-		return ""
-	}
-	data, _ := json.Marshal(ctxMap)
-	return string(data)
+	return state.LLMResp, nil
 }
