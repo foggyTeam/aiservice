@@ -49,11 +49,7 @@ func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData s
 }
 
 func (g *GeminiClient) RecognizeImage(ctx context.Context, input models.ImageInput) (models.TranscriptionResult, error) {
-	gkit := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{APIKey: g.cfg.APIKey}),
-		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
-	)
-	resp, err := genkit.Generate(ctx, gkit,
+	resp, err := genkit.Generate(ctx, g.gkit,
 		ai.WithMessages(
 			ai.NewUserMessage(
 				ai.NewTextPart("What do you see in this image?"),
