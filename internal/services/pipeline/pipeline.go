@@ -127,10 +127,7 @@ func parseTextInputStep(ctx context.Context, state *PipelineState) error {
 	if err := json.Unmarshal(state.Request.Input, &txt); err != nil {
 		return fmt.Errorf("invalid text input: %w", err)
 	}
-	state.Transcription = models.TranscriptionResult{
-		Text:     txt.Text,
-		Language: "en", // Опредение языка убрать
-	}
+	state.Transcription = models.TranscriptionResult{Text: txt.Text}
 	return nil
 }
 

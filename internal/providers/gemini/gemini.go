@@ -9,6 +9,7 @@ import (
 
 	"github.com/aiservice/internal/config"
 	"github.com/aiservice/internal/models"
+	"github.com/aiservice/internal/providers"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
@@ -17,51 +18,33 @@ import (
 type GeminiClient struct {
 	cfg    config.LLMProviderConfig
 	client *http.Client
+	gkit   *genkit.Genkit
 }
 
-func NewGeminiClient(cfg config.LLMProviderConfig) *GeminiClient {
+func NewGeminiClient(ctx context.Context, cfg config.LLMProviderConfig) *GeminiClient {
 	return &GeminiClient{
-		cfg: cfg,
-		client: &http.Client{
-			Timeout: cfg.Timeout,
-		},
+		cfg:    cfg,
+		client: &http.Client{Timeout: cfg.Timeout},
+		gkit: genkit.Init(ctx,
+			genkit.WithPlugins(&googlegenai.GoogleAI{APIKey: cfg.APIKey}),
+			genkit.WithDefaultModel(cfg.Model),
+		),
 	}
 }
 
 func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error) {
-	gkit := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{APIKey: g.cfg.APIKey}),
-		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
-	)
-
-	// Define a recipe generator flow
-	type Hello struct {
-		Name    string `json:"name"`
-		Message string `json:"message"`
-	}
-	recipeGeneratorFlow := genkit.DefineFlow(gkit, "helloFoo", func(ctx context.Context, input *Hello) (*Hello, error) {
-
-		prompt := fmt.Sprintf("Generate a friendly greeting for %s.", input.Name)
-
-		// Generate structured recipe data using the same schema
-		recipe, _, err := genkit.GenerateData[Hello](ctx, gkit, ai.WithPrompt(prompt))
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate recipe: %w", err)
-		}
-
-		return recipe, nil
-	})
-
-	// Run the flow once to test it
-	recipe, err := recipeGeneratorFlow.Run(ctx, &Hello{Name: "Alice"})
+	flow := providers.DefineFlow(g.gkit)
+	response, err := flow.Run(ctx, &providers.LlmRequestFlow{})
 	if err != nil {
-		slog.Error("could not generate recipe:", "err", err)
+		slog.Error("could not generate response:", "err", err)
 		return models.AnalyzeResponse{}, err
 	}
-
-	recipeJSON, _ := json.MarshalIndent(recipe, "", "  ")
-	slog.Info("Sample recipe generated:")
-	slog.Info(string(recipeJSON))
+	recipeJSON, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		slog.Error("could not marshal response:", "err", err)
+		return models.AnalyzeResponse{}, err
+	}
+	slog.Info("analyze response", "response", string(recipeJSON))
 	return models.AnalyzeResponse{}, nil
 }
 

@@ -31,8 +31,11 @@ func main() {
 
 	_ = log.SetupJsonLogger()
 
-	inkRecognizer := initINCRecognizers(cfg)
-	llmClient := initLLMProviders(cfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	inkRecognizer := initINCRecognizers(ctx, cfg)
+	llmClient := initLLMProviders(ctx, cfg)
 
 	analysisService := analysis.NewAnalysisService(cfg.Timeouts.SyncProcess, inkRecognizer, llmClient)
 	jobStorage := storage.NewInMemoryJobStorage()
@@ -65,20 +68,24 @@ func main() {
 	e.POST("/analyze", analyzeHandler.Handle)
 	e.GET("/jobs/:id", analyzeHandler.GetJobStatus)
 
-	startServer(cfg, jobQueueService, e)
+	startServer(ctx, cancel, cfg, jobQueueService, e)
 }
 
-func startServer(cfg *config.Config, jobQueueService *jobservice.JobQueueService, e *echo.Echo) {
+func startServer(ctx context.Context, cancelAiServices context.CancelFunc, cfg *config.Config, jobQueueService *jobservice.JobQueueService, e *echo.Echo) {
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
 		slog.Info("shutting down...")
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+
+		cancelAiServices()
+
+		ctx, cancelWithTimeout := context.WithTimeout(ctx, 10*time.Second)
+		defer cancelWithTimeout()
 
 		jobQueueService.Shutdown()
+
 		if err := e.Shutdown(ctx); err != nil {
 			slog.Error("shutdown error:", "err", err)
 		}
@@ -92,7 +99,7 @@ func startServer(cfg *config.Config, jobQueueService *jobservice.JobQueueService
 	}
 }
 
-func initINCRecognizers(cfg *config.Config) providers.InkRecognizer {
+func initINCRecognizers(ctx context.Context, cfg *config.Config) providers.InkRecognizer {
 	switch cfg.OCR.Provider {
 	case "azure":
 		slog.Info("Using Azure Ink Recognizer")
@@ -100,16 +107,15 @@ func initINCRecognizers(cfg *config.Config) providers.InkRecognizer {
 	case "myscript":
 		slog.Info("Using MyScript Recognizer")
 		return azure.NewMyScriptRecognizer(cfg.OCR)
-
 	case "gemini":
 		slog.Info("Using Gemini LLM")
-		return gemini.NewGeminiClient(cfg.LLM)
+		return gemini.NewGeminiClient(ctx, cfg.LLM)
 	default:
 		panic("no providers")
 	}
 }
 
-func initLLMProviders(cfg *config.Config) providers.LLMClient {
+func initLLMProviders(ctx context.Context, cfg *config.Config) providers.LLMClient {
 	switch cfg.LLM.Provider {
 	case "openai":
 		// TODO вынести в отдельный файл
@@ -120,7 +126,7 @@ func initLLMProviders(cfg *config.Config) providers.LLMClient {
 		return qwen.NewQwenClient(cfg.LLM)
 	case "gemini":
 		slog.Info("Using Gemini LLM")
-		return gemini.NewGeminiClient(cfg.LLM)
+		return gemini.NewGeminiClient(ctx, cfg.LLM)
 	default:
 		panic("no providers")
 	}
