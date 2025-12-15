@@ -49,10 +49,6 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 
 	select {
 	case <-syncCtx.Done():
-		if req.CallbackURL == "" {
-			return models.AnalyzeResponse{}, fmt.Errorf("processing timed out and no callback_url provided")
-		}
-
 		job := jobservice.NewJob(req)
 		if err := s.db.Enqueue(job); err != nil {
 			slog.Warn("enqueue error: %s", slog.Any("err", err))
@@ -80,21 +76,12 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 		Request:     req,
 		ContextData: pipeline.BuildContextData(req.Context),
 	}
-
 	p, err := pipeline.BuildPipeline(req.Type, s.ink, s.llm)
 	if err != nil {
 		return models.AnalyzeResponse{}, err
 	}
-
 	if err := p.Execute(ctx, state); err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
-
-	// attach transcription metadata
-	if state.LLMResp.Metadata == nil {
-		state.LLMResp.Metadata = make(map[string]any)
-	}
-	state.LLMResp.Metadata["transcription_meta"] = state.Transcription.Metadata
-
-	return state.LLMResp, nil
+	return state.Response, nil
 }

@@ -12,23 +12,26 @@ import (
 
 type InkRecognizer interface {
 	RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error)
-	RecognizeImage(ctx context.Context, input models.ImageInput) (models.TranscriptionResult, error)
 }
 
 type LLMClient interface {
-	Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error)
+	Analyze(ctx context.Context, parts []*ai.Part) (models.AnalyzeResponse, error)
 }
 
-type LlmRequestFlow struct {
+type AnalyzeFlow struct {
+	UserPrompt    string               `json:"userPrompt"`
+	Answer        string               `json:"answer"`
+	Graph         string               `json:"graph,omitempty"`
+	FileStructure models.FileStructure `json:"fileStructure"`
 }
 
-func DefineFlow(gkit *genkit.Genkit) *core.Flow[*LlmRequestFlow, *LlmRequestFlow, struct{}] {
-	return genkit.DefineFlow(gkit, "text analyzing flow", func(ctx context.Context, input *LlmRequestFlow) (*LlmRequestFlow, error) {
-		prompt := ""
-		result, _, err := genkit.GenerateData[LlmRequestFlow](ctx, gkit, ai.WithPrompt(prompt))
+func DefineAnalyzeFlow(gkit *genkit.Genkit, parts []*ai.Part) *core.Flow[*AnalyzeFlow, *AnalyzeFlow, struct{}] {
+	return genkit.DefineFlow(gkit, "analyze flow", func(ctx context.Context, input *AnalyzeFlow) (*AnalyzeFlow, error) {
+		prompt := ai.NewUserMessage(parts...)
+		resp, _, err := genkit.GenerateData[AnalyzeFlow](ctx, gkit, ai.WithMessages(prompt))
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate recipe: %w", err)
+			return nil, fmt.Errorf("failed to generate llm request flow: %w", err)
 		}
-		return result, nil
+		return resp, nil
 	})
 }
