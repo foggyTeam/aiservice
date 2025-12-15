@@ -43,7 +43,7 @@ func (h *AnalyzeHandler) Handle(c echo.Context) error {
 		})
 	}
 
-	if req.BoardID == "" || req.UserID == "" || len(req.Input) == 0 {
+	if req.BoardID == "" || req.UserID == "" {
 		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Code:    "MISSING_FIELDS",
 			Message: "board_id, user_id, and input are required",

@@ -32,8 +32,28 @@ func NewGeminiClient(ctx context.Context, cfg config.LLMProviderConfig) *GeminiC
 	}
 }
 
+func (g *GeminiClient) GenerateGraph(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error) {
+	flow := providers.DefineGraphFlow(g.gkit, transcription, contextData)
+	model := &providers.LlmGraphFlow{
+		ContextData: contextData,
+		GraphData:   transcription,
+	}
+	response, err := flow.Run(ctx, model)
+	if err != nil {
+		slog.Error("could not generate response:", "err", err)
+		return models.AnalyzeResponse{}, err
+	}
+	recipeJSON, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		slog.Error("could not marshal response:", "err", err)
+		return models.AnalyzeResponse{}, err
+	}
+	slog.Info("analyze response", "response", string(recipeJSON))
+	return models.AnalyzeResponse{}, nil
+}
+
 func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error) {
-	flow := providers.DefineFlow(g.gkit)
+	flow := providers.DefineFlow(g.gkit, transcription, contextData)
 	response, err := flow.Run(ctx, &providers.LlmRequestFlow{})
 	if err != nil {
 		slog.Error("could not generate response:", "err", err)

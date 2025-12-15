@@ -1,17 +1,14 @@
 package models
 
-import (
-	"encoding/json"
-)
-
 type AnalyzeRequest struct {
-	BoardID     string          `json:"board_id" validate:"required"`
-	UserID      string          `json:"user_id" validate:"required"`
-	Input       json.RawMessage `json:"input" validate:"required"`
-	Context     map[string]any  `json:"context,omitempty"`
-	CallbackURL string          `json:"callback_url,omitempty"`
-	RequestID   string          `json:"request_id,omitempty"`
-	Type        string          `json:"type" validate:"required"`
+	RequestID  string         `json:"requestId,omitempty"`
+	BoardID    string         `json:"boardId" validate:"required"`
+	UserID     string         `json:"userId" validate:"required"`
+	Type       string         `json:"type" validate:"required"`
+	TextInput  TextInput      `json:"textInput"`
+	ImageInput ImageInput     `json:"imageInput"`
+	InkInput   InkInput       `json:"inkInput"`
+	Context    map[string]any `json:"context,omitempty"`
 }
 
 type InkInput struct {

@@ -12,7 +12,6 @@ import (
 
 type PipelineState struct {
 	Request       models.AnalyzeRequest
-	RawInput      any
 	Transcription models.TranscriptionResult
 	LLMResp       models.AnalyzeResponse
 	ContextData   string
@@ -41,54 +40,93 @@ func BuildPipeline(t string, ink providers.InkRecognizer, llm providers.LLMClien
 	switch t {
 	case "ink":
 		return NewPipeline(
-			parseInkInputStep,
-			validateInkInputStep,
+			validateInkInput,
 			recognizeInkStep(ink),
-			llmAnalyzeStep(llm),
 		), nil
 	case "image":
 		return NewPipeline(
-			parseImageInputStep,
+			validateImageInputStep,
 			recognizeImageStep(ink),
-			llmAnalyzeStep(llm),
 		), nil
 	case "text":
 		return NewPipeline(
-			parseTextInputStep,
-			llmAnalyzeStep(llm),
+			validateTextInputStep,
+			llmAnalyzeTextStep(llm),
+		), nil
+	case "textWithImage":
+		return NewPipeline(
+			validateTextInputStep,
+			validateTextInputStep,
+			llmAnalyzeTextImageStep(ink, llm),
 		), nil
 	default:
 		return nil, fmt.Errorf("unsupported input type: %s", t)
 	}
 }
 
-func parseInkInputStep(ctx context.Context, state *PipelineState) error {
-	var ink models.InkInput
-	if err := json.Unmarshal(state.Request.Input, &ink); err != nil {
-		return fmt.Errorf("invalid ink input: %w", err)
+func llmAnalyzeTextImageStep(ink providers.InkRecognizer, llm providers.LLMClient) func(context.Context, *PipelineState) error {
+	return func(ctx context.Context, ps *PipelineState) error {
+		tr, err := ink.RecognizeImage(ctx, ps.Request.ImageInput)
+		if err != nil {
+			return fmt.Errorf("image recognition failed: %w", err)
+		}
+		ps.Transcription = tr
+		ps.LLMResp.Metadata = tr.Metadata
+		// Какой то промежуточный шаг
+		// TODO что делать с проанализированным текстом и входным текстом?
+		resp, err := llm.Analyze(ctx, ps.Transcription.Text, ps.ContextData)
+		if err != nil {
+			return fmt.Errorf("llm analysis failed: %w", err)
+		}
+		ps.LLMResp = resp
+		return nil
 	}
-	state.RawInput = ink
+}
+
+func validateImageInputStep(_ context.Context, state *PipelineState) error {
+	if state.Request.ImageInput.ImageURL == "" {
+		return fmt.Errorf("image URL is required")
+	}
 	return nil
 }
 
-func validateInkInputStep(ctx context.Context, state *PipelineState) error {
-	ink, ok := state.RawInput.(models.InkInput)
-	if !ok {
-		return fmt.Errorf("validateInkInputStep: raw input missing or wrong type")
+func validateInkInput(_ context.Context, state *PipelineState) error {
+	pointCount := 0
+	for _, stroke := range state.Request.InkInput.Strokes {
+		pointCount += len(stroke)
 	}
-	if err := validateInkInput(ink); err != nil {
-		return err
+	if pointCount > MaxStrokesPoints {
+		return fmt.Errorf("too many stroke points: %d (max %d)", pointCount, MaxStrokesPoints)
+	}
+	if pointCount == 0 {
+		return fmt.Errorf("empty strokes")
 	}
 	return nil
+}
+
+func validateTextInputStep(_ context.Context, state *PipelineState) error {
+	if state.Transcription.Text == "" {
+		return fmt.Errorf("text input is empty")
+	}
+	return nil
+}
+func complexImageRecognitionStep(ink providers.InkRecognizer, llm providers.LLMClient) func(context.Context, *PipelineState) error {
+	return func(ctx context.Context, state *PipelineState) error {
+		tr, err := ink.RecognizeImage(ctx, state.Request.ImageInput)
+		if err != nil {
+			return fmt.Errorf("image recognition failed: %w", err)
+		}
+		state.LLMResp = models.AnalyzeResponse{
+			Metadata: tr.Metadata,
+		}
+		state.Transcription = tr
+		return nil
+	}
 }
 
 func recognizeInkStep(ink providers.InkRecognizer) func(context.Context, *PipelineState) error {
 	return func(ctx context.Context, state *PipelineState) error {
-		input, ok := state.RawInput.(models.InkInput)
-		if !ok {
-			return fmt.Errorf("recognizeInkStep: raw input missing or wrong type")
-		}
-		tr, err := ink.RecognizeInk(ctx, input)
+		tr, err := ink.RecognizeInk(ctx, state.Request.InkInput)
 		if err != nil {
 			return fmt.Errorf("ink recognition failed: %w", err)
 		}
@@ -98,22 +136,9 @@ func recognizeInkStep(ink providers.InkRecognizer) func(context.Context, *Pipeli
 	}
 }
 
-func parseImageInputStep(ctx context.Context, state *PipelineState) error {
-	var img models.ImageInput
-	if err := json.Unmarshal(state.Request.Input, &img); err != nil {
-		return fmt.Errorf("invalid image input: %w", err)
-	}
-	state.RawInput = img
-	return nil
-}
-
 func recognizeImageStep(ink providers.InkRecognizer) func(context.Context, *PipelineState) error {
 	return func(ctx context.Context, state *PipelineState) error {
-		img, ok := state.RawInput.(models.ImageInput)
-		if !ok {
-			return fmt.Errorf("recognizeImageStep: raw input missing or wrong type")
-		}
-		tr, err := ink.RecognizeImage(ctx, img)
+		tr, err := ink.RecognizeImage(ctx, state.Request.ImageInput)
 		if err != nil {
 			return fmt.Errorf("image recognition failed: %w", err)
 		}
@@ -122,16 +147,7 @@ func recognizeImageStep(ink providers.InkRecognizer) func(context.Context, *Pipe
 	}
 }
 
-func parseTextInputStep(ctx context.Context, state *PipelineState) error {
-	var txt models.TextInput
-	if err := json.Unmarshal(state.Request.Input, &txt); err != nil {
-		return fmt.Errorf("invalid text input: %w", err)
-	}
-	state.Transcription = models.TranscriptionResult{Text: txt.Text}
-	return nil
-}
-
-func llmAnalyzeStep(llm providers.LLMClient) func(context.Context, *PipelineState) error {
+func llmAnalyzeTextStep(llm providers.LLMClient) func(context.Context, *PipelineState) error {
 	return func(ctx context.Context, state *PipelineState) error {
 		if state.Transcription.Text == "" {
 			return fmt.Errorf("empty transcription for llm analysis")
@@ -143,20 +159,6 @@ func llmAnalyzeStep(llm providers.LLMClient) func(context.Context, *PipelineStat
 		state.LLMResp = resp
 		return nil
 	}
-}
-
-func validateInkInput(input models.InkInput) error {
-	pointCount := 0
-	for _, stroke := range input.Strokes {
-		pointCount += len(stroke)
-	}
-	if pointCount > MaxStrokesPoints {
-		return fmt.Errorf("too many stroke points: %d (max %d)", pointCount, MaxStrokesPoints)
-	}
-	if pointCount == 0 {
-		return fmt.Errorf("empty strokes")
-	}
-	return nil
 }
 
 func BuildContextData(ctxMap map[string]any) string {

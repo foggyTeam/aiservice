@@ -105,9 +105,6 @@ func (q *JobQueueService) processJob(job models.Job) {
 }
 
 func (q *JobQueueService) deliverCallback(job models.Job, payload map[string]any) {
-	if job.Request.CallbackURL == "" {
-		return
-	}
 	// Implementation similar to original postJSON
 	// TODO: implement callback delivery
 }

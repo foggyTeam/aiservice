@@ -49,10 +49,6 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 
 	select {
 	case <-syncCtx.Done():
-		if req.CallbackURL == "" {
-			return models.AnalyzeResponse{}, fmt.Errorf("processing timed out and no callback_url provided")
-		}
-
 		job := jobservice.NewJob(req)
 		if err := s.db.Enqueue(job); err != nil {
 			slog.Warn("enqueue error: %s", slog.Any("err", err))
