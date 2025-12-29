@@ -31,48 +31,86 @@ func NewAnalyzeHandler(
 	}
 }
 
-func (h *AnalyzeHandler) Handle(c echo.Context) error {
-	var req models.AnalyzeRequest
+func validateSummarizeRequest(req models.SummarizeRequest) error {
+	if req.Board.BoardID == "" {
+		return fmt.Errorf("boardID is empty")
+	}
+	if req.UserID == "" {
+		return fmt.Errorf("userID is empty")
+	}
+	return nil
+}
+
+func (h *AnalyzeHandler) Summarize(c echo.Context) error {
+	var req models.SummarizeRequest
 
 	if err := c.Bind(&req); err != nil {
 		slog.Error("bind error:", "err", err)
-		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Code:    "INVALID_REQUEST",
-			Message: "Invalid JSON",
-			Details: err.Error(),
-		})
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
 	}
 
-	if req.BoardID == "" || req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Code:    "MISSING_FIELDS",
-			Message: "board_id, user_id, and input are required",
-		})
+	if err := validateSummarizeRequest(req); err != nil {
+		slog.Error("validation error:", "err", err)
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("invalid request data: %w", err))
 	}
 
-	resp, err := h.service.StartJob(c.Request().Context(), req)
+	analysisReq := models.AnalyzeRequest{RequestType: models.SummarizeType, SummarizeRequest: req}
+	resp, err := h.service.StartJob(c.Request().Context(), analysisReq)
 	if err != nil {
 		slog.Error("analysis error:", "err", err)
-		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Code:    "ANALYSIS_ERROR",
-			Message: "Failed to analyze input",
-			Details: err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to analyze request: %w", err))
 	}
 	return c.JSON(http.StatusOK, resp)
 
+}
+
+func validateStructurizeRequest(req models.StucturizeRequest) error {
+	if req.File.IsEmpty() {
+		return fmt.Errorf("file data is empty")
+	}
+	if req.UserID == "" {
+		return fmt.Errorf("userID is empty")
+	}
+	return nil
+}
+
+func (h *AnalyzeHandler) Structurize(c echo.Context) error {
+	var req models.StucturizeRequest
+
+	if err := c.Bind(&req); err != nil {
+		slog.Error("bind error:", "err", err)
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
+	}
+
+	if err := validateStructurizeRequest(req); err != nil {
+		slog.Error("validation error:", "err", err)
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("invalid request data: %w", err))
+	}
+
+	analysisReq := models.AnalyzeRequest{RequestType: models.StructurizeType, StructurizeRequest: req}
+	resp, err := h.service.StartJob(c.Request().Context(), analysisReq)
+	if err != nil {
+		slog.Error("analysis error:", "err", err)
+		return c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to analyze request: %w", err))
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (h *AnalyzeHandler) GetJobStatus(c echo.Context) error {
 	jobID := c.Param("id")
 	job, err := h.service.GetJob(c.Request().Context(), jobID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Code:    "JOB_NOT_FOUND",
-			Message: fmt.Sprintf("Job %s not found", jobID),
-		})
+		return c.JSON(http.StatusNotFound, fmt.Errorf("failed to get job: %w", err))
 	}
 	return c.JSON(http.StatusOK, job)
+}
+
+func (h *AnalyzeHandler) Abort(c echo.Context) error {
+	jobID := c.Param("id")
+	if err := h.service.Abort(c.Request().Context(), jobID); err != nil {
+		return c.JSON(http.StatusNotFound, fmt.Errorf("failed to abort job: %w", err))
+	}
+	return c.JSON(http.StatusOK, nil)
 }
 
 func HealthHandler(c echo.Context) error {

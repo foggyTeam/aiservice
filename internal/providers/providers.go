@@ -10,25 +10,38 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 )
 
-type InkRecognizer interface {
-	RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error)
-}
-
 type LLMClient interface {
-	Analyze(ctx context.Context, parts []*ai.Part) (models.AnalyzeResponse, error)
+	Structurize(ctx context.Context, parts []*ai.Part) (models.StructurizeResponse, error)
+	Summarize(ctx context.Context, parts []*ai.Part) (models.SummarizeResponse, error)
 }
 
-type AnalyzeFlow struct {
-	UserPrompt    string               `json:"userPrompt"`
-	Answer        string               `json:"answer"`
-	Graph         string               `json:"graph,omitempty"`
-	FileStructure models.FileStructure `json:"fileStructure"`
+type SummarizeFlow struct {
+	Prompt  string      `json:"userPrompt"`
+	Element models.Text `json:"element"`
 }
 
-func DefineAnalyzeFlow(gkit *genkit.Genkit, parts []*ai.Part) *core.Flow[*AnalyzeFlow, *AnalyzeFlow, struct{}] {
-	return genkit.DefineFlow(gkit, "analyze flow", func(ctx context.Context, input *AnalyzeFlow) (*AnalyzeFlow, error) {
+type StructurizeFlow struct {
+	Prompt         string      `json:"userPrompt"`
+	Answer         string      `json:"answer"`
+	AiTreeResponse string      `json:"aiTreeResponse"`
+	File           models.File `json:"file"`
+}
+
+func DefineSummarizeFlow(gkit *genkit.Genkit, parts []*ai.Part) *core.Flow[*SummarizeFlow, *SummarizeFlow, struct{}] {
+	return genkit.DefineFlow(gkit, "summarize flow", func(ctx context.Context, input *SummarizeFlow) (*SummarizeFlow, error) {
 		prompt := ai.NewUserMessage(parts...)
-		resp, _, err := genkit.GenerateData[AnalyzeFlow](ctx, gkit, ai.WithMessages(prompt))
+		resp, _, err := genkit.GenerateData[SummarizeFlow](ctx, gkit, ai.WithMessages(prompt))
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate llm request flow: %w", err)
+		}
+		return resp, nil
+	})
+}
+
+func DefineStructurizeFlow(gkit *genkit.Genkit, parts []*ai.Part) *core.Flow[*StructurizeFlow, *StructurizeFlow, struct{}] {
+	return genkit.DefineFlow(gkit, "structurize flow", func(ctx context.Context, input *StructurizeFlow) (*StructurizeFlow, error) {
+		prompt := ai.NewUserMessage(parts...)
+		resp, _, err := genkit.GenerateData[StructurizeFlow](ctx, gkit, ai.WithMessages(prompt))
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate llm request flow: %w", err)
 		}

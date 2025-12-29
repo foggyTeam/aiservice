@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -38,5 +39,17 @@ func (s *InMemoryJobStorage) Update(job models.Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.jobs[job.ID] = job
+	return nil
+}
+
+func (s *InMemoryJobStorage) Abort(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return fmt.Errorf("job not found")
+	}
+	job.Status = models.JobStatusAborted
+	s.jobs[id] = job
 	return nil
 }
