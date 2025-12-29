@@ -76,21 +76,12 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 		Request:     req,
 		ContextData: pipeline.BuildContextData(req.Context),
 	}
-
 	p, err := pipeline.BuildPipeline(req.Type, s.ink, s.llm)
 	if err != nil {
 		return models.AnalyzeResponse{}, err
 	}
-
 	if err := p.Execute(ctx, state); err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
-
-	// attach transcription metadata
-	if state.LLMResp.Metadata == nil {
-		state.LLMResp.Metadata = make(map[string]any)
-	}
-	state.LLMResp.Metadata["transcription_meta"] = state.Transcription.Metadata
-
-	return state.LLMResp, nil
+	return state.Response, nil
 }

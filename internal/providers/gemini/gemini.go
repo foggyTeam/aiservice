@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -32,56 +31,17 @@ func NewGeminiClient(ctx context.Context, cfg config.LLMProviderConfig) *GeminiC
 	}
 }
 
-func (g *GeminiClient) GenerateGraph(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error) {
-	flow := providers.DefineGraphFlow(g.gkit, transcription, contextData)
-	model := &providers.LlmGraphFlow{
-		ContextData: contextData,
-		GraphData:   transcription,
-	}
-	response, err := flow.Run(ctx, model)
+func (g *GeminiClient) Analyze(ctx context.Context, parts []*ai.Part) (models.AnalyzeResponse, error) {
+	flow := providers.DefineAnalyzeFlow(g.gkit, parts)
+	aiResp, err := flow.Run(ctx, &providers.AnalyzeFlow{})
 	if err != nil {
 		slog.Error("could not generate response:", "err", err)
 		return models.AnalyzeResponse{}, err
 	}
-	recipeJSON, err := json.MarshalIndent(response, "", "  ")
-	if err != nil {
-		slog.Error("could not marshal response:", "err", err)
-		return models.AnalyzeResponse{}, err
-	}
-	slog.Info("analyze response", "response", string(recipeJSON))
-	return models.AnalyzeResponse{}, nil
-}
-
-func (g *GeminiClient) Analyze(ctx context.Context, transcription, contextData string) (models.AnalyzeResponse, error) {
-	flow := providers.DefineFlow(g.gkit, transcription, contextData)
-	response, err := flow.Run(ctx, &providers.LlmRequestFlow{})
-	if err != nil {
-		slog.Error("could not generate response:", "err", err)
-		return models.AnalyzeResponse{}, err
-	}
-	recipeJSON, err := json.MarshalIndent(response, "", "  ")
-	if err != nil {
-		slog.Error("could not marshal response:", "err", err)
-		return models.AnalyzeResponse{}, err
-	}
-	slog.Info("analyze response", "response", string(recipeJSON))
-	return models.AnalyzeResponse{}, nil
-}
-
-func (g *GeminiClient) RecognizeImage(ctx context.Context, input models.ImageInput) (models.TranscriptionResult, error) {
-	resp, err := genkit.Generate(ctx, g.gkit,
-		ai.WithMessages(
-			ai.NewUserMessage(
-				ai.NewTextPart("What do you see in this image?"),
-				ai.NewMediaPart("image/jpeg", input.ImageURL),
-			),
-		))
-	if err != nil {
-		return models.TranscriptionResult{}, fmt.Errorf("gemini image recognition failed: %w", err)
-	}
-	return models.TranscriptionResult{
-		Text:     resp.Message.Text(),
-		Metadata: resp.Message.Metadata,
+	return models.AnalyzeResponse{
+		ResponseMessage: aiResp.Answer,
+		GraphResponse:   aiResp.Graph,
+		FileStructure:   aiResp.FileStructure,
 	}, nil
 }
 

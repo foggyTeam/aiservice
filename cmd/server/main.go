@@ -17,10 +17,7 @@ import (
 	"github.com/aiservice/internal/handlers"
 	"github.com/aiservice/internal/log"
 	"github.com/aiservice/internal/providers"
-	"github.com/aiservice/internal/providers/azure"
 	"github.com/aiservice/internal/providers/gemini"
-	"github.com/aiservice/internal/providers/openai"
-	"github.com/aiservice/internal/providers/qwen"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/storage"
@@ -101,12 +98,6 @@ func startServer(ctx context.Context, cancelAiServices context.CancelFunc, cfg *
 
 func initINCRecognizers(ctx context.Context, cfg *config.Config) providers.InkRecognizer {
 	switch cfg.OCR.Provider {
-	case "azure":
-		slog.Info("Using Azure Ink Recognizer")
-		return azure.NewAzureInkRecognizer(cfg.OCR)
-	case "myscript":
-		slog.Info("Using MyScript Recognizer")
-		return azure.NewMyScriptRecognizer(cfg.OCR)
 	case "gemini":
 		slog.Info("Using Gemini LLM")
 		return gemini.NewGeminiClient(ctx, cfg.LLM)
@@ -118,12 +109,9 @@ func initINCRecognizers(ctx context.Context, cfg *config.Config) providers.InkRe
 func initLLMProviders(ctx context.Context, cfg *config.Config) providers.LLMClient {
 	switch cfg.LLM.Provider {
 	case "openai":
-		// TODO вынести в отдельный файл
-		slog.Info("Using OpenAI LLM")
-		return openai.NewOpenAIClient(cfg.LLM)
-	case "qwen":
-		slog.Info("Using Qwen LLM")
-		return qwen.NewQwenClient(cfg.LLM)
+		// slog.Info("Using OpenAI LLM")
+		// return openai.NewOpenAIClient(cfg.LLM)
+		return nil
 	case "gemini":
 		slog.Info("Using Gemini LLM")
 		return gemini.NewGeminiClient(ctx, cfg.LLM)
