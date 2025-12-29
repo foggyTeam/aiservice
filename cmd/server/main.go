@@ -18,7 +18,7 @@ import (
 	"github.com/aiservice/internal/log"
 	"github.com/aiservice/internal/providers"
 	"github.com/aiservice/internal/providers/gemini"
-	analysis "github.com/aiservice/internal/services/analysis"
+	"github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/storage"
 )

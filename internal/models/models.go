@@ -67,12 +67,6 @@ func (a AcceptedResponse) Error() string {
 	return "job accepted with ID: " + a.JobID
 }
 
-type ErrorResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Details string `json:"details,omitempty"`
-}
-
 type Job struct {
 	ID        string
 	Request   AnalyzeRequest

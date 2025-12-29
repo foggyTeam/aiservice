@@ -5,71 +5,74 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aiservice/internal/mocks"
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/services/storage"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
-type fakeProcessor struct {
-	called chan struct{}
-}
-
-func (f *fakeProcessor) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
-	// signal that Process was invoked
-	select {
-	case f.called <- struct{}{}:
-	default:
-	}
-	return models.AnalyzeResponse{ResponseMessage: "ok"}, nil
-}
-
 func TestWorkerProcessesJobFromQueue(t *testing.T) {
-	st := storage.NewInMemoryJobStorage()
-	fp := &fakeProcessor{called: make(chan struct{}, 1)}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	// create queue service with 1 worker
-	svc := NewJobQueueService(10, 1, st, fp)
-	// svc likely runs workers on creation; push job directly into internal queue
+	st := storage.NewInMemoryJobStorage()
+	mockProc := mocks.NewMockProcessor(ctrl)
+
+	called := make(chan struct{}, 1)
+	mockProc.EXPECT().Process(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
+			called <- struct{}{}
+			return models.AnalyzeResponse{ResponseMessage: "ok"}, nil
+		},
+	).Times(1)
+
+	svc := NewJobQueueService(10, 1, st, mockProc)
+
 	job := models.Job{ID: "job-test-1"}
 	select {
 	case svc.queue <- job:
-	case <-time.After(200 * time.Millisecond):
+	default:
 		t.Fatal("failed to enqueue job into internal queue")
 	}
 
-	// wait for processor to be called
-	select {
-	case <-fp.called:
-		// success
-	case <-time.After(2 * time.Second):
-		t.Fatal("processor was not invoked for queued job")
-	}
+	require.Eventually(t, func() bool {
+		select {
+		case <-called:
+			return true
+		default:
+			return false
+		}
+	}, 2*time.Second, 10*time.Millisecond)
 }
 
 func TestMultipleJobsProcessedConcurrently(t *testing.T) {
-	st := storage.NewInMemoryJobStorage()
-	fp := &fakeProcessor{called: make(chan struct{}, 10)}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	svc := NewJobQueueService(50, 4, st, fp)
+	st := storage.NewInMemoryJobStorage()
+	mockProc := mocks.NewMockProcessor(ctrl)
 
 	const n = 10
-	for i := range n {
+	called := make(chan struct{}, n)
+	mockProc.EXPECT().Process(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
+			called <- struct{}{}
+			return models.AnalyzeResponse{ResponseMessage: "ok"}, nil
+		},
+	).Times(n)
+
+	svc := NewJobQueueService(50, 4, st, mockProc)
+
+	for i := 0; i < n; i++ {
 		j := models.Job{ID: "job-" + string(rune(i+65))}
 		select {
 		case svc.queue <- j:
-		case <-time.After(200 * time.Millisecond):
+		default:
 			t.Fatalf("failed to enqueue job %d", i)
 		}
 	}
 
-	// expect at least n Process calls (buffered channel)
-	timeout := time.After(3 * time.Second)
-	count := 0
-	for count < n {
-		select {
-		case <-fp.called:
-			count++
-		case <-timeout:
-			t.Fatalf("only %d/%d jobs processed", count, n)
-		}
-	}
+	// wait until all calls recorded
+	require.Eventually(t, func() bool { return len(called) == n }, 3*time.Second, 20*time.Millisecond)
 }

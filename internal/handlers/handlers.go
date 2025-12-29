@@ -36,28 +36,17 @@ func (h *AnalyzeHandler) Handle(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		slog.Error("bind error:", "err", err)
-		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Code:    "INVALID_REQUEST",
-			Message: "Invalid JSON",
-			Details: err.Error(),
-		})
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
 	}
 
 	if req.BoardID == "" || req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Code:    "MISSING_FIELDS",
-			Message: "board_id, user_id, and input are required",
-		})
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("invalid request data, boardID: %s, userID: %s", req.BoardID, req.RequestID))
 	}
 
 	resp, err := h.service.StartJob(c.Request().Context(), req)
 	if err != nil {
 		slog.Error("analysis error:", "err", err)
-		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Code:    "ANALYSIS_ERROR",
-			Message: "Failed to analyze input",
-			Details: err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to analyze request: %w", err))
 	}
 	return c.JSON(http.StatusOK, resp)
 
@@ -67,10 +56,7 @@ func (h *AnalyzeHandler) GetJobStatus(c echo.Context) error {
 	jobID := c.Param("id")
 	job, err := h.service.GetJob(c.Request().Context(), jobID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Code:    "JOB_NOT_FOUND",
-			Message: fmt.Sprintf("Job %s not found", jobID),
-		})
+		return c.JSON(http.StatusNotFound, fmt.Errorf("failed to get job: %w", err))
 	}
 	return c.JSON(http.StatusOK, job)
 }
