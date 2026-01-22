@@ -17,7 +17,7 @@ type UserRequest struct {
 	BoardID    string         `json:"boardId" validate:"required"`
 	UserID     string         `json:"userId" validate:"required"`
 	Type       string         `json:"type" validate:"required"`
-    UserPrompt string         `json:"userPrompt" validate:"required"`
+  UserPrompt string         `json:"userPrompt" validate:"required"`
 }
 ```
 

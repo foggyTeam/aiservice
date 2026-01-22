@@ -1,0 +1,47 @@
+{
+  "requestId": "r-unified-001",
+  "requestType": "complex",
+  "boardId": "board-42",
+  "userId": "user-42",
+  "userPrompt": "Создай структуру сайта и предложи улучшения. Формат файлов: HTML.",
+  "canvas": { "width": 1920, "height": 1080, "dpi": 96, "unit": "px" },
+  "elements": [
+    { "id": "el-1", "type": "rect", "rectangle": { "x": 0.10, "y": 0.15, "width": 0.25, "height": 0.12 } },
+    { "id": "el-2", "type": "text", "text": "Проект: Анализ данных", "rectangle": { "x": 0.12, "y": 0.18, "width": 0.2, "height": 0.05 } },
+    { "id": "el-3", "type": "ellipse", "rectangle": { "x": 0.50, "y": 0.10, "width": 0.10, "height": 0.10 } }
+  ],
+  "relationships": [
+    { "from": "el-1", "to": "el-2", "type": "arrow" }
+  ],
+  "strokes": [
+    {
+      "strokeId": "s-1",
+      "points": [
+        { "x": 0.58, "y": 0.48, "t": 1700000000000 },
+        { "x": 0.60, "y": 0.50, "t": 1700000000100 }
+      ]
+    }
+  ],
+  "files": [
+    { 
+      "name": "index.html",
+      "type": "file",
+      "content": "<h1>Home</h1><p>Welcome</p>",
+      "children": []
+    },
+    {
+      "name" : "newDirectory",
+      "type" : "directory",
+      "children" : [
+        {
+          "name": "index2.html",
+          "type": "file",
+          "content": "<h1>Home</h1><p>Hello</p>",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "imageUrl": "s3://aiservice-screenshots/board-42-snap-20260113.png",
+  "graph": "{\"nodes\":[{\"id\":\"home\"},{\"id\":\"posts\"}],\"edges\":[{\"from\":\"home\",\"to\":\"posts\"}]}"
+}
