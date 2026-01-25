@@ -1,72 +1,132 @@
 package models
 
+const (
+	SummarizeType   = "summarize"
+	StructurizeType = "structurize"
+)
+
+// type Rectangle struct {
+// 	BaseElement
+// 	CornerRadius int `json:"cornerRadius"`
+// }
+
+type Text struct {
+	BaseElement
+	Content string `json:"content"`
+}
+
+// type Ellipse struct {
+// 	BaseElement
+// }
+
+// type Line struct {
+// 	BaseElement
+// 	Points  []float32 `json:"points"`  // [x, y], [x, y]
+// 	Tension float32   `json:"tension"` // давление
+// }
+
+// type Elements struct {
+// 	Ellipse
+// 	Rectangle
+
+// 	Line
+// 	Text
+// }
+
+type BaseElement struct {
+	Id          string  `json:"id"`
+	Type        string  `json:"type"` //rect, line, text, ellipse,
+	X           float32 `json:"x"`
+	Y           float32 `json:"y"`
+	Width       float32 `json:"width"`
+	Height      float32 `json:"height"`
+	Rotation    float32 `json:"rotation"`
+	Fill        string  `json:"fill,omitempty"`        // цвет заливки
+	Stroke      string  `json:"stroke,omitempty"`      // цвет обводки
+	StrokeWidth int     `json:"strokeWidth,omitempty"` // толщина обводки
+}
+
+type Element struct {
+	Id          string  `json:"id"`
+	Type        string  `json:"type"` //rect, line, text, ellipse,
+	X           float32 `json:"x"`
+	Y           float32 `json:"y"`
+	Width       float32 `json:"width"`
+	Height      float32 `json:"height"`
+	Rotation    float32 `json:"rotation"`
+	Fill        string  `json:"fill,omitempty"`        // цвет заливки
+	Stroke      string  `json:"stroke,omitempty"`      // цвет обводки
+	StrokeWidth int     `json:"strokeWidth,omitempty"` // толщина обводки
+
+	// inserted from rectangle model
+	CornerRadius int `json:"cornerRadius,omitempty"`
+
+	// inserted from text model
+	Content string `json:"content,omitempty"`
+
+	Points  []float32 `json:"points,omitempty"`  // [x, y], [x, y]
+	Tension float32   `json:"tension,omitempty"` // давление
+}
+
+type Board struct {
+	BoardID  string    `json:"boardId"`
+	ImageURL string    `json:"imageUrl,omitempty"`
+	Elements []Element `json:"elements"`
+}
+
 type AnalyzeRequest struct {
-	RequestID  string         `json:"requestId,omitempty"`
-	BoardID    string         `json:"boardId" validate:"required"`
-	UserID     string         `json:"userId" validate:"required"`
-	Type       string         `json:"type" validate:"required"`
-	TextInput  TextInput      `json:"textInput"`
-	ImageInput ImageInput     `json:"imageInput"`
-	InkInput   InkInput       `json:"inkInput"`
-	Context    map[string]any `json:"context,omitempty"`
-}
-
-type InkInput struct {
-	Type    string         `json:"type"`
-	Strokes [][]InkPoint   `json:"strokes" validate:"required"`
-	Meta    map[string]any `json:"meta,omitempty"`
-}
-
-type InkPoint struct {
-	X        float64 `json:"x" validate:"required"`
-	Y        float64 `json:"y" validate:"required"`
-	T        int64   `json:"t,omitempty"`        // timestamp in ms
-	Pressure float64 `json:"pressure,omitempty"` // 0-1
-	Tilt     float64 `json:"tilt,omitempty"`     // angle in degrees
-}
-
-type ImageInput struct {
-	Type     string         `json:"type"`
-	ImageURL string         `json:"image_url" validate:"required"`
-	Base64   string         `json:"base64,omitempty"` // alternative to URL
-	Meta     map[string]any `json:"meta,omitempty"`
-}
-
-type TextInput struct {
-	Type string `json:"type"`
-	Text string `json:"text" validate:"required"`
+	RequestType        string `json:"requestType"` // summarize, structurize
+	SummarizeRequest   SummarizeRequest
+	StructurizeRequest StucturizeRequest
 }
 
 type AnalyzeResponse struct {
-	ResponseMessage string `json:"responseMessage"`
-	GraphResponse   string `json:"graphResponse,omitempty"`
-	FileStructure   `json:"fileStructure"`
+	SummarizeResponse   SummarizeResponse
+	StructurizeResponse StructurizeResponse
 }
 
-type FileStructure struct {
-	Name     string          `json:"name"`
-	Type     string          `json:"type"`
-	Content  string          `json:"content,omitempty"`
-	Children []FileStructure `json:"children,omitempty"`
+type SummarizeRequest struct {
+	RequestID   string `json:"requestId,omitempty"`
+	UserID      string `json:"userId,omitempty"`
+	RequestType string `json:"requestType"` // summarize
+	Board       Board  `json:"board"`
+}
+type SummarizeResponse struct {
+	RequestID   string `json:"requestId"`
+	UserID      string `json:"userId"`
+	RequestType string `json:"requestType"` // summarize
+	Element     Text   `json:"text"`        // конкретный элемент - текст, который суммаризовал инфу по доске, расположенный в свободном пространстве доски
+}
+type StucturizeRequest struct {
+	RequestID   string `json:"requestId"`
+	UserID      string `json:"userId"`
+	RequestType string `json:"requestType"` // structurize
+	Board       Board  `json:"board"`
+	File        File   `json:"file"`
+}
+type StructurizeResponse struct {
+	RequestID      string `json:"requestId"`
+	UserID         string `json:"userId"`
+	RequestType    string `json:"requestType"`    // structurize
+	AiTreeResponse string `json:"aiTreeResponse"` // дерево ASCII файлов
+	File           File   `json:"file"`
 }
 
-type Action struct {
-	Type    string         `json:"type"`
-	Payload map[string]any `json:"payload,omitempty"`
-	Params  map[string]any `json:"params,omitempty"`
+type File struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
+	Children []File `json:"children"`
 }
 
-type AcceptedResponse struct {
-	JobID     string `json:"job_id"`
-	Status    string `json:"status"`
-	CreatedAt int64  `json:"created_at"`
-	ExpiresAt int64  `json:"expires_at"`
+func (f File) IsEmpty() bool {
+	return f.Name == "" && f.Type == ""
 }
 
-func (a AcceptedResponse) Error() string {
-	return "job accepted with ID: " + a.JobID
+type Abort struct {
+	RequestID string `json:"requestId"`
 }
 
+// Job represents a unit of work in the system.
 type Job struct {
 	ID        string
 	Request   AnalyzeRequest
@@ -82,6 +142,7 @@ const (
 	JobStatusRunning   JobStatus = "running"
 	JobStatusCompleted JobStatus = "completed"
 	JobStatusFailed    JobStatus = "failed"
+	JobStatusAborted   JobStatus = "aborted"
 )
 
 type TranscriptionResult struct {

@@ -2,49 +2,56 @@ package pipeline
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/providers"
 	"github.com/firebase/genkit/go/ai"
 )
 
-func newLlmParts(req models.AnalyzeRequest) ([]*ai.Part, error) {
+func newLlmSummarizeParts(req models.SummarizeRequest) ([]*ai.Part, error) {
 	parts := make([]*ai.Part, 0, 3)
-	if url := req.ImageInput.ImageURL; url != "" {
+	if url := req.Board.ImageURL; url != "" {
 		parts = append(parts, ai.NewMediaPart("image/jpeg", url))
 	}
-	if text := req.TextInput.Text; text != "" {
-		parts = append(parts, ai.NewTextPart(text))
-	}
-	if req.InkInput.Strokes != nil {
-		// TODO convert ink to image or other format
-	}
-	if len(parts) == 0 {
-		return nil, fmt.Errorf("no valid input parts for LLM")
-	}
+	parts = append(parts, ai.NewTextPart("summarize"))
 	return parts, nil
 }
 
-func fileStructureStep(ink providers.InkRecognizer, llm providers.LLMClient) Step {
-	return func(ctx context.Context, ps *PipelineState) error {
+func newLlmStructurizeParts(req models.StucturizeRequest) ([]*ai.Part, error) {
+	parts := make([]*ai.Part, 0, 3)
+	if url := req.Board.ImageURL; url != "" {
+		parts = append(parts, ai.NewMediaPart("image/jpeg", url))
+	}
+	parts = append(parts, ai.NewTextPart("structurize"))
+	return parts, nil
+}
+
+func newSummarizeStep(llm providers.LLMClient) Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		parts, err := newLlmSummarizeParts(state.AnalyzeRequest.SummarizeRequest)
+		if err != nil {
+			return err
+		}
+		resp, err := llm.Summarize(ctx, parts)
+		if err != nil {
+			return err
+		}
+		state.AnalyzeResponse.SummarizeResponse = resp
 		return nil
 	}
 }
 
-func complexAnalyzeStep(_ providers.InkRecognizer, llm providers.LLMClient) Step {
-	return func(ctx context.Context, ps *PipelineState) error {
-		parts, err := newLlmParts(ps.Request)
+func newStructurizeStep(llm providers.LLMClient) Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		parts, err := newLlmStructurizeParts(state.AnalyzeRequest.StructurizeRequest)
 		if err != nil {
 			return err
 		}
-		resp, err := llm.Analyze(ctx, parts)
+		resp, err := llm.Structurize(ctx, parts)
 		if err != nil {
 			return err
 		}
-		ps.Response.ResponseMessage = resp.ResponseMessage
-		ps.Response.FileStructure = resp.FileStructure
-		ps.Response.GraphResponse = resp.GraphResponse
+		state.AnalyzeResponse.StructurizeResponse = resp
 		return nil
 	}
 }

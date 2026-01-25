@@ -42,10 +42,10 @@ func (m *MockProcessor) EXPECT() *MockProcessorMockRecorder {
 }
 
 // Process mocks base method.
-func (m *MockProcessor) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
+func (m *MockProcessor) Process(ctx context.Context, req models.AnalyzeRequest) (models.SummarizeResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Process", ctx, req)
-	ret0, _ := ret[0].(models.AnalyzeResponse)
+	ret0, _ := ret[0].(models.SummarizeResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

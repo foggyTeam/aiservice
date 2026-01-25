@@ -9,89 +9,80 @@
 // Package mocks is a generated GoMock package.
 package mocks
 
-import (
-	context "context"
-	reflect "reflect"
+// // MockInkRecognizer is a mock of InkRecognizer interface.
+// type MockInkRecognizer struct {
+// 	ctrl     *gomock.Controller
+// 	recorder *MockInkRecognizerMockRecorder
+// 	isgomock struct{}
+// }
 
-	models "github.com/aiservice/internal/models"
-	ai "github.com/firebase/genkit/go/ai"
-	gomock "go.uber.org/mock/gomock"
-)
+// // MockInkRecognizerMockRecorder is the mock recorder for MockInkRecognizer.
+// type MockInkRecognizerMockRecorder struct {
+// 	mock *MockInkRecognizer
+// }
 
-// MockInkRecognizer is a mock of InkRecognizer interface.
-type MockInkRecognizer struct {
-	ctrl     *gomock.Controller
-	recorder *MockInkRecognizerMockRecorder
-	isgomock struct{}
-}
+// // NewMockInkRecognizer creates a new mock instance.
+// func NewMockInkRecognizer(ctrl *gomock.Controller) *MockInkRecognizer {
+// 	mock := &MockInkRecognizer{ctrl: ctrl}
+// 	mock.recorder = &MockInkRecognizerMockRecorder{mock}
+// 	return mock
+// }
 
-// MockInkRecognizerMockRecorder is the mock recorder for MockInkRecognizer.
-type MockInkRecognizerMockRecorder struct {
-	mock *MockInkRecognizer
-}
+// // EXPECT returns an object that allows the caller to indicate expected use.
+// func (m *MockInkRecognizer) EXPECT() *MockInkRecognizerMockRecorder {
+// 	return m.recorder
+// }
 
-// NewMockInkRecognizer creates a new mock instance.
-func NewMockInkRecognizer(ctrl *gomock.Controller) *MockInkRecognizer {
-	mock := &MockInkRecognizer{ctrl: ctrl}
-	mock.recorder = &MockInkRecognizerMockRecorder{mock}
-	return mock
-}
+// // RecognizeInk mocks base method.
+// func (m *MockInkRecognizer) RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error) {
+// 	m.ctrl.T.Helper()
+// 	ret := m.ctrl.Call(m, "RecognizeInk", ctx, input)
+// 	ret0, _ := ret[0].(models.TranscriptionResult)
+// 	ret1, _ := ret[1].(error)
+// 	return ret0, ret1
+// }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockInkRecognizer) EXPECT() *MockInkRecognizerMockRecorder {
-	return m.recorder
-}
+// // RecognizeInk indicates an expected call of RecognizeInk.
+// func (mr *MockInkRecognizerMockRecorder) RecognizeInk(ctx, input any) *gomock.Call {
+// 	mr.mock.ctrl.T.Helper()
+// 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecognizeInk", reflect.TypeOf((*MockInkRecognizer)(nil).RecognizeInk), ctx, input)
+// }
 
-// RecognizeInk mocks base method.
-func (m *MockInkRecognizer) RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecognizeInk", ctx, input)
-	ret0, _ := ret[0].(models.TranscriptionResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
+// // MockLLMClient is a mock of LLMClient interface.
+// type MockLLMClient struct {
+// 	ctrl     *gomock.Controller
+// 	recorder *MockLLMClientMockRecorder
+// 	isgomock struct{}
+// }
 
-// RecognizeInk indicates an expected call of RecognizeInk.
-func (mr *MockInkRecognizerMockRecorder) RecognizeInk(ctx, input any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecognizeInk", reflect.TypeOf((*MockInkRecognizer)(nil).RecognizeInk), ctx, input)
-}
+// // MockLLMClientMockRecorder is the mock recorder for MockLLMClient.
+// type MockLLMClientMockRecorder struct {
+// 	mock *MockLLMClient
+// }
 
-// MockLLMClient is a mock of LLMClient interface.
-type MockLLMClient struct {
-	ctrl     *gomock.Controller
-	recorder *MockLLMClientMockRecorder
-	isgomock struct{}
-}
+// // NewMockLLMClient creates a new mock instance.
+// func NewMockLLMClient(ctrl *gomock.Controller) *MockLLMClient {
+// 	mock := &MockLLMClient{ctrl: ctrl}
+// 	mock.recorder = &MockLLMClientMockRecorder{mock}
+// 	return mock
+// }
 
-// MockLLMClientMockRecorder is the mock recorder for MockLLMClient.
-type MockLLMClientMockRecorder struct {
-	mock *MockLLMClient
-}
+// // EXPECT returns an object that allows the caller to indicate expected use.
+// func (m *MockLLMClient) EXPECT() *MockLLMClientMockRecorder {
+// 	return m.recorder
+// }
 
-// NewMockLLMClient creates a new mock instance.
-func NewMockLLMClient(ctrl *gomock.Controller) *MockLLMClient {
-	mock := &MockLLMClient{ctrl: ctrl}
-	mock.recorder = &MockLLMClientMockRecorder{mock}
-	return mock
-}
+// // Analyze mocks base method.
+// func (m *MockLLMClient) Analyze(ctx context.Context, parts []*ai.Part) (models.SummarizeResponse, error) {
+// 	m.ctrl.T.Helper()
+// 	ret := m.ctrl.Call(m, "Analyze", ctx, parts)
+// 	ret0, _ := ret[0].(models.SummarizeResponse)
+// 	ret1, _ := ret[1].(error)
+// 	return ret0, ret1
+// }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockLLMClient) EXPECT() *MockLLMClientMockRecorder {
-	return m.recorder
-}
-
-// Analyze mocks base method.
-func (m *MockLLMClient) Analyze(ctx context.Context, parts []*ai.Part) (models.AnalyzeResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Analyze", ctx, parts)
-	ret0, _ := ret[0].(models.AnalyzeResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Analyze indicates an expected call of Analyze.
-func (mr *MockLLMClientMockRecorder) Analyze(ctx, parts any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Analyze", reflect.TypeOf((*MockLLMClient)(nil).Analyze), ctx, parts)
-}
+// // Analyze indicates an expected call of Analyze.
+// func (mr *MockLLMClientMockRecorder) Analyze(ctx, parts any) *gomock.Call {
+// 	mr.mock.ctrl.T.Helper()
+// 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Analyze", reflect.TypeOf((*MockLLMClient)(nil).Analyze), ctx, parts)
+// }

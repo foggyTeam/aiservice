@@ -11,10 +11,8 @@ import (
 )
 
 type PipelineState struct {
-	Request       models.AnalyzeRequest
-	Response      models.AnalyzeResponse
-	Transcription models.TranscriptionResult
-	ContextData   string
+	AnalyzeRequest  models.AnalyzeRequest
+	AnalyzeResponse models.AnalyzeResponse
 }
 
 type Step func(ctx context.Context, state *PipelineState) error
@@ -36,12 +34,12 @@ func (p *Pipeline) Execute(ctx context.Context, state *PipelineState) error {
 	return nil
 }
 
-func BuildPipeline(t string, ink providers.InkRecognizer, llm providers.LLMClient) (*Pipeline, error) {
+func BuildPipeline(t string, llm providers.LLMClient) (*Pipeline, error) {
 	switch t {
-	case "userQuestion":
-		return NewPipeline(complexAnalyzeStep(ink, llm)), nil
-	case "fileStructure":
-		return NewPipeline(fileStructureStep(ink, llm)), nil
+	case models.SummarizeType:
+		return NewPipeline(newSummarizeStep(llm)), nil
+	case models.StructurizeType:
+		return NewPipeline(newStructurizeStep(llm)), nil
 	default:
 		return nil, fmt.Errorf("unsupported input type: %s", t)
 	}

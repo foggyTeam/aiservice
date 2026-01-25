@@ -13,18 +13,20 @@ import (
 )
 
 type AnalysisService struct {
-	ink     providers.InkRecognizer
 	llm     providers.LLMClient
 	timeout time.Duration
 	db      jobservice.JobQueueService
 }
 
-func NewAnalysisService(timeout time.Duration, ink providers.InkRecognizer, llm providers.LLMClient) *AnalysisService {
+func NewAnalysisService(timeout time.Duration, llm providers.LLMClient) *AnalysisService {
 	return &AnalysisService{
 		timeout: timeout,
-		ink:     ink,
 		llm:     llm,
 	}
+}
+
+func (s *AnalysisService) Abort(ctx context.Context, jobID string) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (s *AnalysisService) GetJob(ctx context.Context, jobID string) (models.Job, error) {
@@ -55,12 +57,14 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 			return models.AnalyzeResponse{}, fmt.Errorf("job queue is full, try again later")
 		}
 
-		return models.AnalyzeResponse{}, models.AcceptedResponse{
-			JobID:     job.ID,
-			Status:    string(models.JobStatusPending),
-			CreatedAt: job.CreatedAt,
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-		}
+		return models.AnalyzeResponse{}, nil
+		// TODO accepted logic
+		// return models.SummarizeResponse{}, models.AcceptedResponse{
+		// 	JobID:     job.ID,
+		// 	Status:    string(models.JobStatusPending),
+		// 	CreatedAt: job.CreatedAt,
+		// 	ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+		// }
 
 	case err := <-errCh:
 		slog.Warn("process error: %s", slog.Any("err", err))
@@ -73,15 +77,17 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
 	state := &pipeline.PipelineState{
-		Request:     req,
-		ContextData: pipeline.BuildContextData(req.Context),
+		AnalyzeRequest: models.AnalyzeRequest{
+			StructurizeRequest: req.StructurizeRequest,
+			SummarizeRequest:   req.SummarizeRequest,
+		},
 	}
-	p, err := pipeline.BuildPipeline(req.Type, s.ink, s.llm)
+	p, err := pipeline.BuildPipeline(req.RequestType, s.llm)
 	if err != nil {
 		return models.AnalyzeResponse{}, err
 	}
 	if err := p.Execute(ctx, state); err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
-	return state.Response, nil
+	return state.AnalyzeResponse, nil
 }

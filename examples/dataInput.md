@@ -63,7 +63,7 @@ For example:
 ```
 
 ```Go
-type StructureAnalyzeResponse struct {
+type StructureSummarizeResponse struct {
     LlmAnswer string `json:"llmAnswer"`
     Files []File `json:"files,omitempty"`
 }
@@ -138,7 +138,7 @@ Prompt: userRequest.UserPromt
 ```
 
 ```Go
-type ComplexAnalyzeResponse struct {
+type ComplexSummarizeResponse struct {
     LlmAnswer string `json:"llmAnswer"`
     Graph     string `json:"graph",omitempty`
     Files     []File `json:"files,omitempty"`
@@ -170,7 +170,7 @@ type ComplexAnalyzeResponse struct {
 }
 ```
 
-// Response: StructureAnalyzeResponse
+// Response: StructureSummarizeResponse
 ```json
 {
   "llmAnswer": "Generated a clear site structure with pages, blog posts, and assets.",

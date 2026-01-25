@@ -21,6 +21,7 @@ type JobStorage interface {
 	Save(job models.Job) error
 	Get(id string) (models.Job, error)
 	Update(job models.Job) error
+	Abort(ctx context.Context, id string) error
 }
 
 type Processor interface {

@@ -31,10 +31,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	inkRecognizer := initINCRecognizers(ctx, cfg)
 	llmClient := initLLMProviders(ctx, cfg)
 
-	analysisService := analysis.NewAnalysisService(cfg.Timeouts.SyncProcess, inkRecognizer, llmClient)
+	analysisService := analysis.NewAnalysisService(cfg.Timeouts.SyncProcess, llmClient)
 	jobStorage := storage.NewInMemoryJobStorage()
 	jobQueueService := jobservice.NewJobQueueService(
 		cfg.Job.QueueSize,
@@ -55,15 +54,17 @@ func main() {
 		}),
 	)
 
-	analyzeHandler := handlers.NewAnalyzeHandler(
+	AnalyzeHandler := handlers.NewAnalyzeHandler(
 		analysisService,
 		jobQueueService,
 		cfg.Timeouts.SyncProcess,
 	)
 
 	e.GET("/health", handlers.HealthHandler)
-	e.POST("/analyze", analyzeHandler.Handle)
-	e.GET("/jobs/:id", analyzeHandler.GetJobStatus)
+	e.GET("/jobs/:id", AnalyzeHandler.GetJobStatus)
+	e.PUT("/jobs/:id/abort", AnalyzeHandler.Abort)
+	e.POST("/summarize", AnalyzeHandler.Summarize)
+	e.POST("/structurize", AnalyzeHandler.Structurize)
 
 	startServer(ctx, cancel, cfg, jobQueueService, e)
 }
@@ -93,16 +94,6 @@ func startServer(ctx context.Context, cancelAiServices context.CancelFunc, cfg *
 
 	if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
 		slog.Error("server error:", "err", err)
-	}
-}
-
-func initINCRecognizers(ctx context.Context, cfg *config.Config) providers.InkRecognizer {
-	switch cfg.OCR.Provider {
-	case "gemini":
-		slog.Info("Using Gemini LLM")
-		return gemini.NewGeminiClient(ctx, cfg.LLM)
-	default:
-		panic("no providers")
 	}
 }
 

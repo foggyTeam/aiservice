@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -31,20 +30,27 @@ func NewGeminiClient(ctx context.Context, cfg config.LLMProviderConfig) *GeminiC
 	}
 }
 
-func (g *GeminiClient) Analyze(ctx context.Context, parts []*ai.Part) (models.AnalyzeResponse, error) {
-	flow := providers.DefineAnalyzeFlow(g.gkit, parts)
-	aiResp, err := flow.Run(ctx, &providers.AnalyzeFlow{})
+func (g *GeminiClient) Summarize(ctx context.Context, parts []*ai.Part) (models.SummarizeResponse, error) {
+	flow := providers.DefineSummarizeFlow(g.gkit, parts)
+	aiResp, err := flow.Run(ctx, &providers.SummarizeFlow{})
 	if err != nil {
 		slog.Error("could not generate response:", "err", err)
-		return models.AnalyzeResponse{}, err
+		return models.SummarizeResponse{}, err
 	}
-	return models.AnalyzeResponse{
-		ResponseMessage: aiResp.Answer,
-		GraphResponse:   aiResp.Graph,
-		FileStructure:   aiResp.FileStructure,
+	return models.SummarizeResponse{
+		Element: aiResp.Element,
 	}, nil
 }
 
-func (g *GeminiClient) RecognizeInk(ctx context.Context, input models.InkInput) (models.TranscriptionResult, error) {
-	return models.TranscriptionResult{}, fmt.Errorf("gemini does not support ink recognition")
+func (g *GeminiClient) Structurize(ctx context.Context, parts []*ai.Part) (models.StructurizeResponse, error) {
+	flow := providers.DefineStructurizeFlow(g.gkit, parts)
+	aiResp, err := flow.Run(ctx, &providers.StructurizeFlow{})
+	if err != nil {
+		slog.Error("could not generate response:", "err", err)
+		return models.StructurizeResponse{}, err
+	}
+	return models.StructurizeResponse{
+		AiTreeResponse: aiResp.AiTreeResponse,
+		File:           aiResp.File,
+	}, nil
 }
