@@ -10,6 +10,7 @@ import (
 	"github.com/aiservice/internal/providers"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/pipeline"
+	"github.com/aiservice/internal/utils"
 )
 
 type ErrAccepted struct {
@@ -67,7 +68,6 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 	// case: got response
 	//		return resp
 
-
 	//	GetJobStatus
 	// lock map
 	// get status
@@ -85,8 +85,12 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 	case <-syncCtx.Done():
 		job := jobservice.NewJob(req)
 		if err := s.db.Enqueue(job); err != nil {
+			if _, ok := utils.MapErr[jobservice.QueueFullErr](err); ok {
+				slog.Warn("job queue is full")
+				return models.AnalyzeResponse{}, ErrAccepted{JobID: job.ID}
+			}
 			slog.Warn("enqueue error: %s", slog.Any("err", err))
-			return models.AnalyzeResponse{}, fmt.Errorf("job queue is full, try again later")
+			return models.AnalyzeResponse{}, err
 		}
 		return models.AnalyzeResponse{}, ErrAccepted{JobID: job.ID}
 	case err := <-errCh:
@@ -99,11 +103,11 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 }
 
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
-	state := &pipeline.PipelineState{AnalyzeRequest: req}
 	p, err := pipeline.BuildPipeline(req.RequestType, s.llm)
 	if err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("failed to build pipeline: %w", err)
 	}
+	state := &pipeline.PipelineState{AnalyzeRequest: req}
 	if err := p.Execute(ctx, state); err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}

@@ -37,9 +37,7 @@ func (g *GeminiClient) Summarize(ctx context.Context, parts []*ai.Part) (models.
 		slog.Error("could not generate response:", "err", err)
 		return models.SummarizeResponse{}, err
 	}
-	return models.SummarizeResponse{
-		Element: aiResp.Element,
-	}, nil
+	return models.SummarizeResponse{Element: aiResp.Element}, nil
 }
 
 func (g *GeminiClient) Structurize(ctx context.Context, parts []*ai.Part) (models.StructurizeResponse, error) {

@@ -85,6 +85,13 @@ func (q *JobQueueService) cleanJobs(jobs ...models.Job) error {
 	return q.storage.DeleteJobs(abortedJobsIds...)
 }
 
+type QueueFullErr struct {
+}
+
+func (q QueueFullErr) Error() string {
+	return "queue is full"
+}
+
 func (q *JobQueueService) Enqueue(job models.Job) error {
 	if err := q.storage.Save(job); err != nil {
 		return fmt.Errorf("failed to save job: %w", err)
@@ -93,7 +100,7 @@ func (q *JobQueueService) Enqueue(job models.Job) error {
 	case q.queue <- job:
 		return nil
 	default:
-		return fmt.Errorf("job queue full")
+		return QueueFullErr{}
 	}
 }
 
