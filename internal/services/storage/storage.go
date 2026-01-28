@@ -73,7 +73,7 @@ func (s *InMemoryJobStorage) DeleteJobs(ids ...string) error {
 	return nil
 }
 
-// func (s *InMemoryJobStorage) Lock() func() {
-// 	s.mu.Lock()
-// 	return s.mu.Unlock
-// }
+func (s *InMemoryJobStorage) Lock() func() {
+	s.mu.Lock()
+	return s.mu.Unlock
+}
