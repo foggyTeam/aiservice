@@ -17,7 +17,7 @@ func newLlmSummarizeParts(req models.SummarizeRequest) ([]*ai.Part, error) {
 	return parts, nil
 }
 
-func newLlmStructurizeParts(req models.StucturizeRequest) ([]*ai.Part, error) {
+func newLlmStructurizeParts(req models.StructurizeRequest) ([]*ai.Part, error) {
 	parts := make([]*ai.Part, 0, 3)
 	if url := req.Board.ImageURL; url != "" {
 		parts = append(parts, ai.NewMediaPart("image/jpeg", url))

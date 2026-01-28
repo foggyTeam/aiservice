@@ -5,6 +5,13 @@ const (
 	StructurizeType = "structurize"
 )
 
+const (
+	RectangeType = "rectangle"
+	TextType     = "text"
+	EllipseType  = "ellipse"
+	LineTypeType = "line"
+)
+
 // type Rectangle struct {
 // 	BaseElement
 // 	CornerRadius int `json:"cornerRadius"`
@@ -77,7 +84,15 @@ type Board struct {
 type AnalyzeRequest struct {
 	RequestType        string `json:"requestType"` // summarize, structurize
 	SummarizeRequest   SummarizeRequest
-	StructurizeRequest StucturizeRequest
+	StructurizeRequest StructurizeRequest
+}
+
+func NewSumAnalyzeReq(req SummarizeRequest) AnalyzeRequest {
+	return AnalyzeRequest{RequestType: SummarizeType, SummarizeRequest: req}
+}
+
+func NewStructAnalyzeReq(req StructurizeRequest) AnalyzeRequest {
+	return AnalyzeRequest{RequestType: StructurizeType, StructurizeRequest: req}
 }
 
 type AnalyzeResponse struct {
@@ -97,7 +112,7 @@ type SummarizeResponse struct {
 	RequestType string `json:"requestType"` // summarize
 	Element     Text   `json:"text"`        // конкретный элемент - текст, который суммаризовал инфу по доске, расположенный в свободном пространстве доски
 }
-type StucturizeRequest struct {
+type StructurizeRequest struct {
 	RequestID   string `json:"requestId"`
 	UserID      string `json:"userId"`
 	RequestType string `json:"requestType"` // structurize
