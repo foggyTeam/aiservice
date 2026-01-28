@@ -38,6 +38,7 @@ func main() {
 	jobQueueService := jobservice.NewJobQueueService(
 		cfg.Job.QueueSize,
 		cfg.Job.WorkerCount,
+		cfg.Job.DbWorkerCount,
 		jobStorage,
 		analysisService,
 	)

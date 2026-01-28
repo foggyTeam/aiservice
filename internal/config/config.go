@@ -35,10 +35,11 @@ type OCRProviderConfig struct {
 }
 
 type JobConfig struct {
-	QueueSize    int
-	WorkerCount  int
-	MaxRetries   int
-	RetryBackoff time.Duration
+	QueueSize     int
+	WorkerCount   int
+	DbWorkerCount int
+	MaxRetries    int
+	RetryBackoff  time.Duration
 }
 
 type TimeoutsConfig struct {
@@ -71,10 +72,11 @@ func LoadFromEnv() *Config {
 			// Timeout:  getDurationEnv("OCR_TIMEOUT", 8*time.Second),
 		},
 		Job: JobConfig{
-			QueueSize:    getIntEnv("JOB_QUEUE_SIZE", 100),
-			WorkerCount:  getIntEnv("JOB_WORKERS", 2),
-			MaxRetries:   getIntEnv("JOB_MAX_RETRIES", 3),
-			RetryBackoff: getDurationEnv("JOB_RETRY_BACKOFF", 2*time.Second),
+			QueueSize:     getIntEnv("JOB_QUEUE_SIZE", 100),
+			WorkerCount:   getIntEnv("JOB_WORKERS", 2),
+			DbWorkerCount: getIntEnv("DB_JOB_WORKERS", 1),
+			MaxRetries:    getIntEnv("JOB_MAX_RETRIES", 3),
+			RetryBackoff:  getDurationEnv("JOB_RETRY_BACKOFF", 2*time.Second),
 		},
 		Timeouts: TimeoutsConfig{
 			SyncProcess:  getDurationEnv("TIMEOUT_SYNC_PROCESS", 20*time.Minute),

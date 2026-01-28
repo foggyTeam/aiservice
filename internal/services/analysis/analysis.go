@@ -12,6 +12,14 @@ import (
 	"github.com/aiservice/internal/services/pipeline"
 )
 
+type ErrAccepted struct {
+	JobID string
+}
+
+func (e ErrAccepted) Error() string {
+	return fmt.Sprintf("job: %s in processing", e.JobID)
+}
+
 type AnalysisService struct {
 	llm     providers.LLMClient
 	timeout time.Duration
@@ -26,7 +34,14 @@ func NewAnalysisService(timeout time.Duration, llm providers.LLMClient) *Analysi
 }
 
 func (s *AnalysisService) Abort(ctx context.Context, jobID string) error {
-	return fmt.Errorf("not implemented")
+	job, err := s.db.GetJob(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if job.Status == models.JobStatusPending {
+		return s.db.Abort(ctx, jobID)
+	}
+	return nil
 }
 
 func (s *AnalysisService) GetJob(ctx context.Context, jobID string) (models.Job, error) {
@@ -39,6 +54,23 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 
 	resultCh := make(chan models.AnalyzeResponse, 1)
 	errCh := make(chan error, 1)
+
+	// PROCESSING
+	// lock map
+	// add to map
+	// enqueue
+	// unlock map
+
+	// select
+	// case: ctx.Done
+	//		return 202
+	// case: got response
+	//		return resp
+
+
+	//	GetJobStatus
+	// lock map
+	// get status
 
 	go func() {
 		resp, err := s.Process(syncCtx, req)
@@ -56,16 +88,7 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 			slog.Warn("enqueue error: %s", slog.Any("err", err))
 			return models.AnalyzeResponse{}, fmt.Errorf("job queue is full, try again later")
 		}
-
-		return models.AnalyzeResponse{}, nil
-		// TODO accepted logic
-		// return models.SummarizeResponse{}, models.AcceptedResponse{
-		// 	JobID:     job.ID,
-		// 	Status:    string(models.JobStatusPending),
-		// 	CreatedAt: job.CreatedAt,
-		// 	ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-		// }
-
+		return models.AnalyzeResponse{}, ErrAccepted{JobID: job.ID}
 	case err := <-errCh:
 		slog.Warn("process error: %s", slog.Any("err", err))
 		return models.AnalyzeResponse{}, fmt.Errorf("failed to process request: %w", err)
@@ -76,15 +99,10 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 }
 
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
-	state := &pipeline.PipelineState{
-		AnalyzeRequest: models.AnalyzeRequest{
-			StructurizeRequest: req.StructurizeRequest,
-			SummarizeRequest:   req.SummarizeRequest,
-		},
-	}
+	state := &pipeline.PipelineState{AnalyzeRequest: req}
 	p, err := pipeline.BuildPipeline(req.RequestType, s.llm)
 	if err != nil {
-		return models.AnalyzeResponse{}, err
+		return models.AnalyzeResponse{}, fmt.Errorf("failed to build pipeline: %w", err)
 	}
 	if err := p.Execute(ctx, state); err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)

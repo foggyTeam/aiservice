@@ -53,3 +53,27 @@ func (s *InMemoryJobStorage) Abort(ctx context.Context, id string) error {
 	s.jobs[id] = job
 	return nil
 }
+
+func (s *InMemoryJobStorage) GetAll() ([]models.Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	jobs := make([]models.Job, 0, len(s.jobs))
+	for _, j := range s.jobs {
+		jobs = append(jobs, j)
+	}
+	return jobs, nil
+}
+
+func (s *InMemoryJobStorage) DeleteJobs(ids ...string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, id := range ids {
+		delete(s.jobs, id)
+	}
+	return nil
+}
+
+// func (s *InMemoryJobStorage) Lock() func() {
+// 	s.mu.Lock()
+// 	return s.mu.Unlock
+// }
