@@ -18,9 +18,44 @@ func validateSummarizeRequest(req models.SummarizeRequest) error {
 	if req.UserID == "" {
 		return fmt.Errorf("userID is empty")
 	}
+
+	// Validate board elements
+	if len(req.Board.Elements) > 1000 { // Prevent too many elements
+		return fmt.Errorf("too many elements in board, maximum allowed is 1000")
+	}
+
+	// Validate individual elements
+	for _, elem := range req.Board.Elements {
+		if elem.Id == "" {
+			return fmt.Errorf("element ID cannot be empty")
+		}
+
+		// Validate coordinates and dimensions are reasonable
+		if elem.Width < 0 || elem.Height < 0 {
+			return fmt.Errorf("element width and height must be non-negative")
+		}
+
+		// Validate content length if it's a text element
+		if elem.Type == "text" && len(elem.Content) > 10000 {
+			return fmt.Errorf("text content too long, maximum allowed is 10000 characters")
+		}
+	}
+
 	return nil
 }
 
+// Summarize processes a board and returns a summary
+// @Summary Summarize a board
+// @Description Process a board and return a summary of the content
+// @Tags Processing
+// @Accept json
+// @Produce json
+// @Param request body models.SummarizeRequest true "Summarize Request"
+// @Success 200 {object} models.SummarizeResponse
+// @Success 202 {string} string "Job ID"
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /summarize [post]
 func (h *AnalyzeHandler) Summarize(c echo.Context) error {
 	var req models.SummarizeRequest
 

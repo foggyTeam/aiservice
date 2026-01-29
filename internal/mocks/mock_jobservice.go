@@ -42,10 +42,10 @@ func (m *MockProcessor) EXPECT() *MockProcessorMockRecorder {
 }
 
 // Process mocks base method.
-func (m *MockProcessor) Process(ctx context.Context, req models.AnalyzeRequest) (models.SummarizeResponse, error) {
+func (m *MockProcessor) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Process", ctx, req)
-	ret0, _ := ret[0].(models.SummarizeResponse)
+	ret0, _ := ret[0].(models.AnalyzeResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -80,6 +80,52 @@ func (m *MockJobStorage) EXPECT() *MockJobStorageMockRecorder {
 	return m.recorder
 }
 
+// Abort mocks base method.
+func (m *MockJobStorage) Abort(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Abort", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Abort indicates an expected call of Abort.
+func (mr *MockJobStorageMockRecorder) Abort(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Abort", reflect.TypeOf((*MockJobStorage)(nil).Abort), ctx, id)
+}
+
+// Close mocks base method.
+func (m *MockJobStorage) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockJobStorageMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockJobStorage)(nil).Close))
+}
+
+// DeleteJobs mocks base method.
+func (m *MockJobStorage) DeleteJobs(ids ...string) error {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range ids {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteJobs", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteJobs indicates an expected call of DeleteJobs.
+func (mr *MockJobStorageMockRecorder) DeleteJobs(ids ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteJobs", reflect.TypeOf((*MockJobStorage)(nil).DeleteJobs), ids...)
+}
+
 // Get mocks base method.
 func (m *MockJobStorage) Get(id string) (models.Job, error) {
 	m.ctrl.T.Helper()
@@ -93,6 +139,21 @@ func (m *MockJobStorage) Get(id string) (models.Job, error) {
 func (mr *MockJobStorageMockRecorder) Get(id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockJobStorage)(nil).Get), id)
+}
+
+// GetAll mocks base method.
+func (m *MockJobStorage) GetAll() ([]models.Job, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAll")
+	ret0, _ := ret[0].([]models.Job)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAll indicates an expected call of GetAll.
+func (mr *MockJobStorageMockRecorder) GetAll() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockJobStorage)(nil).GetAll))
 }
 
 // Save mocks base method.
