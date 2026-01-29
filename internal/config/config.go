@@ -12,6 +12,7 @@ type Config struct {
 	OCR      OCRProviderConfig
 	Job      JobConfig
 	Timeouts TimeoutsConfig
+	Database DatabaseConfig
 }
 
 type ServerConfig struct {
@@ -48,6 +49,18 @@ type TimeoutsConfig struct {
 	LLMRequest   time.Duration
 }
 
+type DatabaseConfig struct {
+	Type     string // "memory", "sqlite"
+	Host     string
+	Port     string
+	Name     string
+	User     string
+	Password string
+	SSLMode  string
+	FilePath string // For SQLite
+	Debug    bool   // Enable SQL logging
+}
+
 func LoadFromEnv() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -82,6 +95,17 @@ func LoadFromEnv() *Config {
 			SyncProcess:  getDurationEnv("TIMEOUT_SYNC_PROCESS", 20*time.Minute),
 			InkRecognize: getDurationEnv("TIMEOUT_INK_RECOGNIZE", 20*time.Minute),
 			LLMRequest:   getDurationEnv("TIMEOUT_LLM_REQUEST", 20*time.Minute),
+		},
+		Database: DatabaseConfig{
+			Type:     getEnv("DB_TYPE", "memory"), // Default to memory for backward compatibility
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnv("DB_PORT", "5432"),
+			Name:     getEnv("DB_NAME", "aiservice"),
+			User:     getEnv("DB_USER", "postgres"),
+			Password: getEnv("DB_PASSWORD", ""),
+			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			FilePath: getEnv("SQLITE_FILE_PATH", "./aiservice.db"), // Default SQLite file path
+			Debug:    getEnv("DB_DEBUG", "false") == "true",
 		},
 	}
 }

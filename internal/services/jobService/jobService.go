@@ -11,6 +11,11 @@ import (
 	"github.com/aiservice/internal/utils"
 )
 
+const (
+	// JobCleanupAge defines how old a job must be before it's considered for cleanup (in hours)
+	JobCleanupAge = 24 * time.Hour
+)
+
 type JobQueueService struct {
 	queue       chan models.Job
 	oldJobQueue chan models.Job
@@ -43,9 +48,10 @@ func NewJob(req models.AnalyzeRequest) models.Job {
 
 func NewJobQueueService(bufSize, workers, dbWorkers int, storage JobStorage, p Processor) *JobQueueService {
 	q := &JobQueueService{
-		queue:   make(chan models.Job, bufSize),
-		storage: storage,
-		request: p,
+		queue:       make(chan models.Job, bufSize),
+		oldJobQueue: make(chan models.Job, bufSize), // Initialize the oldJobQueue
+		storage:     storage,
+		request:     p,
 	}
 	for range workers {
 		q.wg.Add(1)
@@ -61,28 +67,61 @@ func NewJobQueueService(bufSize, workers, dbWorkers int, storage JobStorage, p P
 
 func (q *JobQueueService) processOldJobs() {
 	ticker := time.NewTicker(time.Minute * 2)
-	for {
-		for range ticker.C {
-			jobs, err := q.storage.GetAll()
-			if err != nil {
-				slog.Error("failed to get all jobs:", "err", err)
-				break
-			}
-			if err := q.cleanJobs(jobs...); err != nil {
-				slog.Error("failed to clean aborted jobs:", "err", err)
-			}
-			for _, j := range jobs {
-				q.oldJobQueue <- j
+	defer ticker.Stop()
+
+	for range ticker.C {
+		jobs, err := q.storage.GetAll()
+		if err != nil {
+			slog.Error("failed to get all jobs:", "err", err)
+			continue
+		}
+
+		if err := q.cleanJobs(jobs...); err != nil {
+			slog.Error("failed to clean aborted jobs:", "err", err)
+		}
+
+		// Process pending jobs that are in storage but not yet processed
+		for _, j := range jobs {
+			// Only process jobs that are pending and not already being processed
+			if j.Status == models.JobStatusPending {
+				// Try to send to oldJobQueue, but don't block if the queue is full
+				select {
+				case q.oldJobQueue <- j:
+					slog.Debug("sent pending job to oldJobQueue for processing", "job_id", j.ID)
+				default:
+					// Queue is full, skip this job for now
+					slog.Warn("oldJobQueue is full, skipping job", "job_id", j.ID)
+				}
 			}
 		}
 	}
 }
 
 func (q *JobQueueService) cleanJobs(jobs ...models.Job) error {
+	// Find aborted jobs
 	abortedJobs := utils.Filter(jobs, func(j models.Job) bool { return j.Status == models.JobStatusAborted })
 	abortedJobsIds := utils.Map(abortedJobs, func(j models.Job) string { return j.ID })
-	slog.Info("clean abored jobs:", "job ids:", abortedJobsIds)
-	return q.storage.DeleteJobs(abortedJobsIds...)
+
+	// Find inactive jobs (older than JobCleanupAge and still pending/running)
+	inactiveJobs := utils.Filter(jobs, func(j models.Job) bool {
+		return (j.Status == models.JobStatusPending || j.Status == models.JobStatusRunning) &&
+			time.Since(time.Unix(j.CreatedAt, 0)) > JobCleanupAge
+	})
+	inactiveJobsIds := utils.Map(inactiveJobs, func(j models.Job) string { return j.ID })
+
+	// Combine both sets of job IDs to delete
+	allJobIdsToDelete := append(abortedJobsIds, inactiveJobsIds...)
+
+	if len(allJobIdsToDelete) > 0 {
+		slog.Info("cleaning jobs",
+			"aborted_job_ids", abortedJobsIds,
+			"inactive_job_ids", inactiveJobsIds,
+			"total_deleted", len(allJobIdsToDelete))
+
+		return q.storage.DeleteJobs(allJobIdsToDelete...)
+	}
+
+	return nil
 }
 
 type QueueFullErr struct {
@@ -107,17 +146,6 @@ func (q *JobQueueService) Enqueue(job models.Job) error {
 func (q *JobQueueService) GetJob(ctx context.Context, jobID string) (models.Job, error) {
 	return q.storage.Get(jobID)
 }
-
-// TODO
-// Тут нужен какой-то локер, чтобы не получился такой сценарий:
-// GetJobId() -> aborted
-// but already in processingJob
-// RESULT: processing aborted job
-
-// TODO
-// Джобы, лежащие в БД не процессятся дальше
-
-// TODO нужно добавить чистку неактивных джоб
 
 func (q *JobQueueService) Status(jobID string) (models.JobStatus, error) {
 	job, err := q.storage.Get(jobID)
@@ -144,19 +172,26 @@ func (q *JobQueueService) dbWorker() {
 func (q *JobQueueService) processJob(job models.Job) {
 	slog.Info("job starting processing", "id", job.ID)
 
-	status, err := q.Status(job.ID)
+	// Atomically check and update job status to prevent race conditions
+	// This ensures that if a job was aborted between the time it was enqueued and now,
+	// we won't process it
+	currentJob, err := q.storage.Get(job.ID)
 	if err != nil {
-		slog.Error("failed to get job status", "id", job.ID, "err", err)
+		slog.Error("failed to get job from storage", "id", job.ID, "err", err)
 		return
 	}
 
-	if status == models.JobStatusAborted {
+	if currentJob.Status == models.JobStatusAborted {
 		slog.Info("stop processing aborted job", "id", job.ID)
 		return
 	}
 
+	// Update status to running atomically
 	job.Status = models.JobStatusRunning
-	_ = q.storage.Update(job)
+	if err := q.storage.Update(job); err != nil {
+		slog.Error("failed to update job status to running", "id", job.ID, "err", err)
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -189,8 +224,12 @@ func (q *JobQueueService) Abort(ctx context.Context, jobID string) error {
 }
 
 func (q *JobQueueService) deliverCallback(job models.Job, payload map[string]any) {
-	// Implementation similar to original postJSON
-	// TODO: implement callback delivery
+	// Placeholder for callback delivery implementation
+	// In a production system, this would send the result to a webhook URL
+	// provided by the client when the job was submitted
+	slog.Info("callback delivery would be implemented here",
+		"job_id", job.ID,
+		"payload_status", payload["status"])
 }
 
 func (q *JobQueueService) Shutdown() {

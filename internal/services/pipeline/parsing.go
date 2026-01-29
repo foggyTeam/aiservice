@@ -6,10 +6,6 @@ import (
 	"github.com/aiservice/internal/models"
 )
 
-// TODO
-// После теста стало ясно, что не стоит отдельно парсить,
-// можно передовать полные структуры и вроде ок работает
-
 var TestData = []models.Element{
 	// 1. Заголовок
 	{

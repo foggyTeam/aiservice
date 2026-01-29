@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/aiservice/internal/models"
+	"github.com/aiservice/internal/preprocessing"
 	"github.com/aiservice/internal/providers"
 	"github.com/firebase/genkit/go/ai"
 )
@@ -27,15 +28,15 @@ type BaseElement struct {
 	Width       float32 json:"width"
 	Height      float32 json:"height"
 	Rotation    float32 json:"rotation"
-	Fill        string  json:"fill,omitempty"      
-	Stroke      string  json:"stroke,omitempty"    
+	Fill        string  json:"fill,omitempty"
+	Stroke      string  json:"stroke,omitempty"
 	StrokeWidth int     json:"strokeWidth,omitempty"
 	Content 	string  json:"content"
 }
 2) В поле Content напиши к чему пришли пользователи.
 3) Сформируй правильное положение элемента относительно других, он должен находится в свободном месте.
 4) Content - это html тип, который ограничен следующими тегами:
-	TODO: скинь сюла подерживаемые теги
+	Поддерживаемые теги: <p>, <br>, <strong>, <em>, <ul>, <ol>, <li>
 `
 
 const structurizePrompt = `
@@ -71,22 +72,15 @@ systemd─┬─AmneziaVPN-serv───AmneziaVPN-serv───{AmneziaVPN-serv
         ├─bluetoothd
 `
 
+// Preprocessor for transforming raw data into structured formats
+var preprocessor = preprocessing.NewPreprocessor()
+
 func newLlmSummarizeParts(req models.SummarizeRequest) ([]*ai.Part, error) {
-	parts := make([]*ai.Part, 0, 3)
-	if url := req.Board.ImageURL; url != "" {
-		parts = append(parts, ai.NewMediaPart("image/jpeg", url))
-	}
-	parts = append(parts, ai.NewTextPart(summarizePrompt))
-	return parts, nil
+	return preprocessor.PreprocessSummarizeRequest(req)
 }
 
 func newLlmStructurizeParts(req models.StructurizeRequest) ([]*ai.Part, error) {
-	parts := make([]*ai.Part, 0, 3)
-	if url := req.Board.ImageURL; url != "" {
-		parts = append(parts, ai.NewMediaPart("image/jpeg", url))
-	}
-	parts = append(parts, ai.NewTextPart(structurizePrompt))
-	return parts, nil
+	return preprocessor.PreprocessStructurizeRequest(req)
 }
 
 func newSummarizeStep(llm providers.LLMClient) Step {

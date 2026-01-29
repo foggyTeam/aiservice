@@ -56,22 +56,6 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 	resultCh := make(chan models.AnalyzeResponse, 1)
 	errCh := make(chan error, 1)
 
-	// PROCESSING
-	// lock map
-	// add to map
-	// enqueue
-	// unlock map
-
-	// select
-	// case: ctx.Done
-	//		return 202
-	// case: got response
-	//		return resp
-
-	//	GetJobStatus
-	// lock map
-	// get status
-
 	go func() {
 		resp, err := s.Process(syncCtx, req)
 		if err != nil {

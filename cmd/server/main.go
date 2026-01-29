@@ -13,14 +13,15 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
+	"github.com/aiservice/internal/cache"
 	"github.com/aiservice/internal/config"
 	"github.com/aiservice/internal/handlers"
 	"github.com/aiservice/internal/log"
 	"github.com/aiservice/internal/providers"
 	"github.com/aiservice/internal/providers/gemini"
 	"github.com/aiservice/internal/services/analysis"
+	"github.com/aiservice/internal/services/database"
 	jobservice "github.com/aiservice/internal/services/jobService"
-	"github.com/aiservice/internal/services/storage"
 )
 
 func main() {
@@ -33,13 +34,36 @@ func main() {
 
 	llmClient := initLLMProviders(ctx, cfg)
 
-	analysisService := analysis.NewAnalysisService(cfg.Timeouts.SyncProcess, llmClient)
-	jobStorage := storage.NewInMemoryJobStorage()
+	// Initialize cache
+	appCache := cache.NewInMemoryCache()
+
+	// Wrap LLM client with caching if enabled
+	var wrappedLLMClient providers.LLMClient
+	if cfg.Server.Env == "prod" {
+		wrappedLLMClient = cache.NewCachedLLMClient(llmClient, appCache)
+	} else {
+		wrappedLLMClient = llmClient // Don't cache in dev to see fresh results
+	}
+
+	analysisService := analysis.NewAnalysisService(cfg.Timeouts.SyncProcess, wrappedLLMClient)
+	jobStorage, err := database.NewStorage(cfg.Database)
+	if err != nil {
+		slog.Error("failed to create storage:", "err", err)
+	}
+
+	// Wrap storage with caching if enabled
+	var wrappedStorage jobservice.JobStorage
+	if cfg.Server.Env == "prod" {
+		wrappedStorage = cache.NewCachedJobStorage(jobStorage, appCache)
+	} else {
+		wrappedStorage = jobStorage // Don't cache in dev to see fresh results
+	}
+
 	jobQueueService := jobservice.NewJobQueueService(
 		cfg.Job.QueueSize,
 		cfg.Job.WorkerCount,
 		cfg.Job.DbWorkerCount,
-		jobStorage,
+		wrappedStorage,
 		analysisService,
 	)
 
