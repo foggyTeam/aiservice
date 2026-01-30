@@ -22,31 +22,50 @@ func (e ErrAccepted) Error() string {
 }
 
 type AnalysisService struct {
-	llm     providers.LLMClient
-	timeout time.Duration
-	db      jobservice.JobQueueService
+	llm       providers.LLMClient
+	timeout   time.Duration
+	jobQueue  *jobservice.JobQueueService
 }
 
-func NewAnalysisService(timeout time.Duration, llm providers.LLMClient) *AnalysisService {
+func NewAnalysisService(timeout time.Duration, llm providers.LLMClient, jobQueue *jobservice.JobQueueService) *AnalysisService {
+	return &AnalysisService{
+		timeout:  timeout,
+		llm:      llm,
+		jobQueue: jobQueue,
+	}
+}
+
+// Alternative constructor for when job queue is set later
+func NewAnalysisServiceWithoutJobQueue(timeout time.Duration, llm providers.LLMClient) *AnalysisService {
 	return &AnalysisService{
 		timeout: timeout,
 		llm:     llm,
 	}
 }
 
+func (s *AnalysisService) SetJobQueueService(jobQueueService *jobservice.JobQueueService) {
+	s.jobQueue = jobQueueService
+}
+
 func (s *AnalysisService) Abort(ctx context.Context, jobID string) error {
-	job, err := s.db.GetJob(ctx, jobID)
+	if s.jobQueue == nil {
+		return fmt.Errorf("job queue service not initialized")
+	}
+	job, err := s.jobQueue.GetJob(ctx, jobID)
 	if err != nil {
 		return err
 	}
 	if job.Status == models.JobStatusPending {
-		return s.db.Abort(ctx, jobID)
+		return s.jobQueue.Abort(ctx, jobID)
 	}
 	return nil
 }
 
 func (s *AnalysisService) GetJob(ctx context.Context, jobID string) (models.Job, error) {
-	return s.db.GetJob(ctx, jobID)
+	if s.jobQueue == nil {
+		return models.Job{}, fmt.Errorf("job queue service not initialized")
+	}
+	return s.jobQueue.GetJob(ctx, jobID)
 }
 
 func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
@@ -68,7 +87,7 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 	select {
 	case <-syncCtx.Done():
 		job := jobservice.NewJob(req)
-		if err := s.db.Enqueue(job); err != nil {
+		if err := s.jobQueue.Enqueue(job); err != nil {
 			if _, ok := utils.MapErr[jobservice.QueueFullErr](err); ok {
 				slog.Warn("job queue is full")
 				return models.AnalyzeResponse{}, ErrAccepted{JobID: job.ID}

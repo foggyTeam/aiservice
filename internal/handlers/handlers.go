@@ -28,6 +28,16 @@ func NewAnalyzeHandler(
 	}
 }
 
+// GetJobStatus retrieves the status of a specific job
+// @Summary Get job status
+// @Description Get the status of a job by ID
+// @Tags Jobs
+// @Accept json
+// @Produce json
+// @Param id path string true "Job ID"
+// @Success 200 {object} models.Job
+// @Failure 404 {object} map[string]string
+// @Router /jobs/{id} [get]
 func (h *AnalyzeHandler) GetJobStatus(c echo.Context) error {
 	jobID := c.Param("id")
 	job, err := h.service.GetJob(c.Request().Context(), jobID)
@@ -37,6 +47,16 @@ func (h *AnalyzeHandler) GetJobStatus(c echo.Context) error {
 	return c.JSON(http.StatusOK, job)
 }
 
+// Abort aborts a specific job
+// @Summary Abort a job
+// @Description Abort a job by ID
+// @Tags Jobs
+// @Accept json
+// @Produce json
+// @Param id path string true "Job ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]string
+// @Router /jobs/{id}/abort [put]
 func (h *AnalyzeHandler) Abort(c echo.Context) error {
 	jobID := c.Param("id")
 	if err := h.service.Abort(c.Request().Context(), jobID); err != nil {
@@ -45,6 +65,14 @@ func (h *AnalyzeHandler) Abort(c echo.Context) error {
 	return c.JSON(http.StatusOK, nil)
 }
 
+// HealthHandler returns the health status of the service
+// @Summary Health check
+// @Description Check if the service is running
+// @Tags Health
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /health [get]
 func HealthHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status": "ok",

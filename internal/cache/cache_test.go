@@ -146,3 +146,8 @@ func (m *MockJobStorage) DeleteJobs(ids ...string) error {
 	}
 	return nil
 }
+
+func (m *MockJobStorage) Close() error {
+	// For testing purposes, no resources to close
+	return nil
+}

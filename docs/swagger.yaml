@@ -1,0 +1,359 @@
+basePath: /
+definitions:
+  models.AnalyzeRequest:
+    properties:
+      requestType:
+        description: summarize, structurize
+        type: string
+      structurizeRequest:
+        $ref: '#/definitions/models.StructurizeRequest'
+      summarizeRequest:
+        $ref: '#/definitions/models.SummarizeRequest'
+    type: object
+  models.Board:
+    properties:
+      boardId:
+        type: string
+      elements:
+        items:
+          $ref: '#/definitions/models.Element'
+        type: array
+      imageUrl:
+        type: string
+    type: object
+  models.Element:
+    properties:
+      content:
+        description: inserted from text model
+        type: string
+      cornerRadius:
+        description: inserted from rectangle model
+        type: integer
+      fill:
+        description: цвет заливки
+        type: string
+      height:
+        type: number
+      id:
+        type: string
+      points:
+        description: '[x, y], [x, y]'
+        items:
+          type: number
+        type: array
+      rotation:
+        type: number
+      stroke:
+        description: цвет обводки
+        type: string
+      strokeWidth:
+        description: толщина обводки
+        type: integer
+      tension:
+        description: давление
+        type: number
+      type:
+        description: rect, line, text, ellipse,
+        type: string
+      width:
+        type: number
+      x:
+        type: number
+      "y":
+        type: number
+    type: object
+  models.File:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/models.File'
+        type: array
+      name:
+        example: main.go
+        type: string
+      type:
+        description: doc, simple, graph,(поле children пустое) | section (содердит
+          детей)
+        example: doc
+        type: string
+    type: object
+  models.Job:
+    properties:
+      createdAt:
+        format: int64
+        type: integer
+      id:
+        type: string
+      request:
+        $ref: '#/definitions/models.AnalyzeRequest'
+      retries:
+        type: integer
+      status:
+        $ref: '#/definitions/models.JobStatus'
+    type: object
+  models.JobStatus:
+    enum:
+    - pending
+    - running
+    - completed
+    - failed
+    - aborted
+    type: string
+    x-enum-varnames:
+    - JobStatusPending
+    - JobStatusRunning
+    - JobStatusCompleted
+    - JobStatusFailed
+    - JobStatusAborted
+  models.StructurizeRequest:
+    properties:
+      board:
+        $ref: '#/definitions/models.Board'
+      file:
+        $ref: '#/definitions/models.File'
+      requestId:
+        type: string
+      requestType:
+        description: structurize
+        type: string
+      userId:
+        type: string
+    type: object
+  models.StructurizeResponse:
+    properties:
+      aiTreeResponse:
+        description: дерево ASCII файлов
+        type: string
+      file:
+        $ref: '#/definitions/models.File'
+      requestId:
+        type: string
+      requestType:
+        description: structurize
+        type: string
+      userId:
+        type: string
+    type: object
+  models.SummarizeRequest:
+    properties:
+      board:
+        $ref: '#/definitions/models.Board'
+      requestId:
+        type: string
+      requestType:
+        description: summarize
+        type: string
+      userId:
+        type: string
+    type: object
+  models.SummarizeResponse:
+    properties:
+      requestId:
+        type: string
+      requestType:
+        description: summarize
+        type: string
+      text:
+        allOf:
+        - $ref: '#/definitions/models.Text'
+        description: конкретный элемент - текст, который суммаризовал инфу по доске,
+          расположенный в свободном пространстве доски
+      userId:
+        type: string
+    type: object
+  models.Text:
+    properties:
+      content:
+        type: string
+      fill:
+        description: цвет заливки
+        type: string
+      height:
+        type: number
+      id:
+        type: string
+      rotation:
+        type: number
+      stroke:
+        description: цвет обводки
+        type: string
+      strokeWidth:
+        description: толщина обводки
+        type: integer
+      type:
+        description: rect, line, text, ellipse,
+        type: string
+      width:
+        type: number
+      x:
+        type: number
+      "y":
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: AI Service for processing board data with summarization and structurization
+    capabilities
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: AIService API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Check if the service is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - Health
+  /jobs/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get the status of a job by ID
+      parameters:
+      - description: Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Job'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get job status
+      tags:
+      - Jobs
+  /jobs/{id}/abort:
+    put:
+      consumes:
+      - application/json
+      description: Abort a job by ID
+      parameters:
+      - description: Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Abort a job
+      tags:
+      - Jobs
+  /structurize:
+    post:
+      consumes:
+      - application/json
+      description: Process a board and return a structured file hierarchy
+      parameters:
+      - description: Structurize Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.StructurizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StructurizeResponse'
+        "202":
+          description: Job ID
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Structurize a board
+      tags:
+      - Processing
+  /summarize:
+    post:
+      consumes:
+      - application/json
+      description: Process a board and return a summary of the content
+      parameters:
+      - description: Summarize Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.SummarizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SummarizeResponse'
+        "202":
+          description: Job ID
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Summarize a board
+      tags:
+      - Processing
+schemes:
+- http
+- https
+swagger: "2.0"

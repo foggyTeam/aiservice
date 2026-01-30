@@ -60,10 +60,20 @@ func NewPreprocessor() *Preprocessor {
 
 // PreprocessSummarizeRequest transforms a raw summarize request into a structured format
 func (p *Preprocessor) PreprocessSummarizeRequest(req models.SummarizeRequest) ([]*ai.Part, error) {
+	// Check for potential memory issues
+	if len(req.Board.Elements) > 1000 {
+		return nil, fmt.Errorf("too many elements in board, maximum allowed is 1000")
+	}
+
 	// Preserve raw data
 	rawData, err := json.Marshal(req.Board)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal raw board data: %w", err)
+	}
+
+	// Check if the marshaled data is too large
+	if len(rawData) > 10*1024*1024 { // 10MB limit
+		return nil, fmt.Errorf("board data too large, maximum allowed is 10MB")
 	}
 
 	// Perform spatial analysis
@@ -75,6 +85,12 @@ func (p *Preprocessor) PreprocessSummarizeRequest(req models.SummarizeRequest) (
 
 	// Create semantic annotations
 	semanticAnnotations := p.annotateSemantics(req.Board.Elements)
+
+	// Check if combined analysis is too large
+	totalSize := len(rawData) + len(spatialAnalysis) + len(semanticAnnotations)
+	if totalSize > 20*1024*1024 { // 20MB limit for combined analysis
+		return nil, fmt.Errorf("combined analysis data too large, maximum allowed is 20MB")
+	}
 
 	// Combine raw data with spatial and semantic information
 	structuredPrompt := fmt.Sprintf(`BOARD ANALYSIS:
@@ -104,10 +120,20 @@ Please provide a summary of the key points and conclusions from this board, cons
 
 // PreprocessStructurizeRequest transforms a raw structurize request into a structured format
 func (p *Preprocessor) PreprocessStructurizeRequest(req models.StructurizeRequest) ([]*ai.Part, error) {
+	// Check for potential memory issues
+	if len(req.Board.Elements) > 1000 {
+		return nil, fmt.Errorf("too many elements in board, maximum allowed is 1000")
+	}
+
 	// Preserve raw data
 	rawData, err := json.Marshal(req.Board)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal raw board data: %w", err)
+	}
+
+	// Check if the marshaled data is too large
+	if len(rawData) > 10*1024*1024 { // 10MB limit
+		return nil, fmt.Errorf("board data too large, maximum allowed is 10MB")
 	}
 
 	// Perform spatial analysis
@@ -122,6 +148,12 @@ func (p *Preprocessor) PreprocessStructurizeRequest(req models.StructurizeReques
 
 	// Create a structured representation of the file hierarchy
 	fileStructure := p.createFileHierarchyDescription(req.File)
+
+	// Check if combined analysis is too large
+	totalSize := len(rawData) + len(spatialAnalysis) + len(semanticAnnotations) + len(fileStructure)
+	if totalSize > 20*1024*1024 { // 20MB limit for combined analysis
+		return nil, fmt.Errorf("combined analysis data too large, maximum allowed is 20MB")
+	}
 
 	// Combine raw data with spatial and semantic information
 	structuredPrompt := fmt.Sprintf(`PROJECT STRUCTURIZATION REQUEST:

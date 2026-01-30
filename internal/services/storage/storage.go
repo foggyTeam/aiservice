@@ -73,6 +73,11 @@ func (s *InMemoryJobStorage) DeleteJobs(ids ...string) error {
 	return nil
 }
 
+func (s *InMemoryJobStorage) Close() error {
+	// No resources to close for in-memory storage
+	return nil
+}
+
 func (s *InMemoryJobStorage) Lock() func() {
 	s.mu.Lock()
 	return s.mu.Unlock

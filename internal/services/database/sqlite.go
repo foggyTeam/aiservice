@@ -218,13 +218,15 @@ func (s *SQLiteJobStorage) DeleteJobs(ids ...string) error {
 	}
 
 	// Build a parameterized query for deletion
-	placeholders := strings.Repeat("?,", len(ids)-1) + "?"
-	query := fmt.Sprintf("DELETE FROM jobs WHERE id IN (%s)", placeholders)
-
+	placeholders := make([]string, len(ids))
 	args := make([]any, len(ids))
+
 	for i, id := range ids {
+		placeholders[i] = "?"
 		args[i] = id
 	}
+
+	query := fmt.Sprintf("DELETE FROM jobs WHERE id IN (%s)", strings.Join(placeholders, ","))
 
 	result, err := s.db.Exec(query, args...)
 	if err != nil {

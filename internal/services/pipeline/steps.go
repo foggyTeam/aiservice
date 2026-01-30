@@ -124,8 +124,8 @@ func newStructurizeStep(llm providers.LLMClient) Step {
 
 func fillStructRespWithMeta(aiResp models.StructurizeResponse, state *PipelineState) models.StructurizeResponse {
 	return models.StructurizeResponse{
-		RequestID:      state.AnalyzeRequest.SummarizeRequest.RequestID,
-		UserID:         state.AnalyzeRequest.SummarizeRequest.UserID,
+		RequestID:      state.AnalyzeRequest.StructurizeRequest.RequestID,
+		UserID:         state.AnalyzeRequest.StructurizeRequest.UserID,
 		RequestType:    models.StructurizeType,
 		AiTreeResponse: aiResp.AiTreeResponse,
 		File:           aiResp.File,

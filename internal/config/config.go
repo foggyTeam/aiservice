@@ -77,12 +77,10 @@ func LoadFromEnv() *Config {
 			APIKey:   getEnv("GEMINI_API_KEY", ""),
 		},
 		OCR: OCRProviderConfig{
-			Provider: getEnv("LLM_PROVIDER", "gemini"),
-			APIKey:   getEnv("GEMINI_API_KEY", ""),
-			// Provider: getEnv("OCR_PROVIDER", "azure"),
-			// APIKey:   getEnv("OCR_API_KEY", ""),
-			// BaseURL:  getEnv("OCR_BASE_URL", ""),
-			// Timeout:  getDurationEnv("OCR_TIMEOUT", 8*time.Second),
+			Provider: getEnv("OCR_PROVIDER", "gemini"),
+			APIKey:   getEnv("OCR_API_KEY", ""),
+			BaseURL:  getEnv("OCR_BASE_URL", ""),
+			Timeout:  getDurationEnv("OCR_TIMEOUT", 8*time.Second),
 		},
 		Job: JobConfig{
 			QueueSize:     getIntEnv("JOB_QUEUE_SIZE", 100),
@@ -92,9 +90,9 @@ func LoadFromEnv() *Config {
 			RetryBackoff:  getDurationEnv("JOB_RETRY_BACKOFF", 2*time.Second),
 		},
 		Timeouts: TimeoutsConfig{
-			SyncProcess:  getDurationEnv("TIMEOUT_SYNC_PROCESS", 20*time.Minute),
-			InkRecognize: getDurationEnv("TIMEOUT_INK_RECOGNIZE", 20*time.Minute),
-			LLMRequest:   getDurationEnv("TIMEOUT_LLM_REQUEST", 20*time.Minute),
+			SyncProcess:  getDurationEnv("TIMEOUT_SYNC_PROCESS", 5*time.Minute),
+			InkRecognize: getDurationEnv("TIMEOUT_INK_RECOGNIZE", 2*time.Minute),
+			LLMRequest:   getDurationEnv("TIMEOUT_LLM_REQUEST", 2*time.Minute),
 		},
 		Database: DatabaseConfig{
 			Type:     getEnv("DB_TYPE", "memory"), // Default to memory for backward compatibility
