@@ -52,3 +52,7 @@ func (g *GeminiClient) Structurize(ctx context.Context, parts []*ai.Part) (model
 		File:           aiResp.File,
 	}, nil
 }
+
+func (g *GeminiClient) GetName() string {
+	return "gemini"
+}

@@ -21,6 +21,8 @@ import (
 	"github.com/aiservice/internal/providers"
 	"github.com/aiservice/internal/providers/gemini"
 	"github.com/aiservice/internal/providers/mock"
+	openaimock "github.com/aiservice/internal/providers/openai"
+	yandexmock "github.com/aiservice/internal/providers/yandex"
 	"github.com/aiservice/internal/services/analysis"
 	"github.com/aiservice/internal/services/database"
 	jobservice "github.com/aiservice/internal/services/jobService"
@@ -175,20 +177,62 @@ func startServer(ctx context.Context, cancelAiServices context.CancelFunc, cfg *
 }
 
 func initLLMProviders(ctx context.Context, cfg *config.Config) providers.LLMClient {
-	switch cfg.LLM.Provider {
-	case "openai":
-		// slog.Info("Using OpenAI LLM")
-		// return openai.NewOpenAIClient(cfg.LLM)
-		return nil
-	case "gemini":
-		if cfg.LLM.APIKey == "" || cfg.LLM.APIKey == "your_api_key_here" {
-			slog.Warn("Gemini API key not provided or is default example value, using mock client")
-			return mock.NewMockClient()
-		}
-		slog.Info("Using Gemini LLM")
-		return gemini.NewGeminiClient(ctx, cfg.LLM)
-	default:
-		slog.Warn("Unknown LLM provider, using mock client", "provider", cfg.LLM.Provider)
-		return mock.NewMockClient()
+	// Create provider manager with multi-provider configuration
+	providerConfig := &providers.MultiProviderConfig{
+		Providers: []providers.ProviderConfig{
+			{
+				Name:     "gemini",
+				APIKey:   cfg.LLM.APIKey,
+				BaseURL:  cfg.LLM.BaseURL,
+				Model:    cfg.LLM.Model,
+				Timeout:  cfg.LLM.Timeout,
+				Regions:  []string{"!RU"}, // Not available in Russia
+				Priority: 1,
+				Enabled:  cfg.LLM.APIKey != "" && cfg.LLM.APIKey != "your_api_key_here",
+			},
+			{
+				Name:     "openai-mock",
+				APIKey:   "mock-key",
+				BaseURL:  "https://mock.openai.api",
+				Model:    "gpt-4-mock",
+				Timeout:  30 * time.Second,
+				Regions:  []string{"RU", "US", "EU"}, // Available globally
+				Priority: 2,
+				Enabled:  true,
+			},
+			{
+				Name:     "yandex-gpt-mock",
+				APIKey:   "mock-key",
+				BaseURL:  "https://mock.yandex.api",
+				Model:    "yandex-gpt-mock",
+				Timeout:  30 * time.Second,
+				Regions:  []string{"RU", "CIS"}, // Available in Russia/CIS
+				Priority: 3,
+				Enabled:  true,
+			},
+		},
 	}
+
+	providerManager := providers.NewProviderManager(providerConfig)
+
+	// Register providers
+	if cfg.LLM.APIKey != "" && cfg.LLM.APIKey != "your_api_key_here" {
+		geminiClient := gemini.NewGeminiClient(ctx, cfg.LLM)
+		providerManager.RegisterProvider("gemini", geminiClient)
+	} else {
+		slog.Warn("Gemini API key not provided or is default example value")
+		// Still register a disabled gemini client for completeness
+		mockGemini := mock.NewMockClient()
+		providerManager.RegisterProvider("gemini", mockGemini)
+	}
+
+	// Register mock providers
+	openaiClient := openaimock.NewOpenAIClient()
+	providerManager.RegisterProvider("openai-mock", openaiClient)
+
+	yandexClient := yandexmock.NewYandexGPTClient()
+	providerManager.RegisterProvider("yandex-gpt-mock", yandexClient)
+
+	slog.Info("Initialized provider manager with multiple providers")
+	return providerManager
 }

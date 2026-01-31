@@ -42,3 +42,8 @@ func (m *MockClient) Structurize(ctx context.Context, parts []*ai.Part) (models.
 		},
 	}, nil
 }
+
+// GetName returns the provider name
+func (m *MockClient) GetName() string {
+	return "mock"
+}
