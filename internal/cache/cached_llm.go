@@ -109,3 +109,7 @@ func (c *CachedLLMClient) generateCacheKey(operation string, parts []*ai.Part) (
 
 	return fmt.Sprintf("llm:%s", key), nil
 }
+
+func (c *CachedLLMClient) GetName() string {
+	return c.client.GetName()
+}

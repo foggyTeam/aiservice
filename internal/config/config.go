@@ -28,6 +28,21 @@ type LLMProviderConfig struct {
 	Timeout  time.Duration
 }
 
+type MultiProviderConfig struct {
+	Providers []ProviderConfig `json:"providers"`
+}
+
+type ProviderConfig struct {
+	Name     string        `json:"name"`
+	APIKey   string        `json:"api_key"`
+	BaseURL  string        `json:"base_url"`
+	Model    string        `json:"model"`
+	Timeout  time.Duration `json:"timeout"`
+	Regions  []string      `json:"regions"`  // Supported regions
+	Priority int           `json:"priority"` // Lower number = higher priority
+	Enabled  bool          `json:"enabled"`
+}
+
 type OCRProviderConfig struct {
 	Provider string // "azure", "myscript", "google"
 	APIKey   string

@@ -13,6 +13,7 @@ import (
 type LLMClient interface {
 	Structurize(ctx context.Context, parts []*ai.Part) (models.StructurizeResponse, error)
 	Summarize(ctx context.Context, parts []*ai.Part) (models.SummarizeResponse, error)
+	GetName() string // Added for provider identification
 }
 
 type SummarizeFlow struct {
