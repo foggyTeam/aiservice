@@ -30,11 +30,11 @@ func (o *OpenAIClient) Summarize(ctx context.Context, parts []*ai.Part) (models.
 	response := models.SummarizeResponse{
 		Element: models.Text{
 			BaseElement: models.BaseElement{
-				Id:    "mock-element-id",
-				Type:  "text",
-				X:     100,
-				Y:     100,
-				Width: 200,
+				Id:     "mock-element-id",
+				Type:   "text",
+				X:      100,
+				Y:      100,
+				Width:  200,
 				Height: 100,
 			},
 			Content: "This is a mock summary from OpenAI provider",
@@ -51,16 +51,18 @@ func (o *OpenAIClient) Structurize(ctx context.Context, parts []*ai.Part) (model
 	time.Sleep(150 * time.Millisecond)
 
 	// For demo purposes, return a mock response
+	fileStructure := models.File{
+		Name: "mock-project",
+		Type: "section",
+		Children: []*models.File{
+			{Name: "main.go", Type: "doc"},
+			{Name: "utils", Type: "section"},
+		},
+	}
+
 	response := models.StructurizeResponse{
 		AiTreeResponse: "mock-tree-response-from-openai",
-		File: models.File{
-			Name: "mock-project",
-			Type: "section",
-			Children: []models.File{
-				{Name: "main.go", Type: "doc"},
-				{Name: "utils", Type: "section"},
-			},
-		},
+		File:           fileStructure,
 	}
 
 	slog.Info("OpenAI mock client processed structurize request")

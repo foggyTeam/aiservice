@@ -64,7 +64,7 @@ func TestPreprocessor(t *testing.T) {
 			File: models.File{
 				Name: "project-root",
 				Type: "section",
-				Children: []models.File{
+				Children: []*models.File{
 					{
 						Name: "src",
 						Type: "section",

@@ -128,13 +128,18 @@ type StructurizeResponse struct {
 }
 
 type File struct {
-	Name     string `json:"name" example:"main.go"`
-	Type     string `json:"type" example:"doc"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
-	Children []File `json:"children"`
+	Name     string  `json:"name" example:"main.go"`
+	Type     string  `json:"type" example:"doc"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
+	Children []*File `json:"children"`
 }
 
 func (f File) IsEmpty() bool {
 	return f.Name == "" && f.Type == ""
+}
+
+// IsPopulated checks if the file has meaningful content
+func (f File) IsPopulated() bool {
+	return f.Name != "" || f.Type != "" || len(f.Children) > 0
 }
 
 type Abort struct {
