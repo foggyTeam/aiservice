@@ -59,7 +59,7 @@ type StructurizeResponse struct {
 type File struct {
 	Name     string json:"name"
 	Type     string json:"type" //doc, simple, graph(тогда поле children пустое), section(тогда содердит детей)
-	Children []File json:"children"
+	Children []*File json:"children"
 }
 
 6) В поле AiTreeResponse следует также добавить строковое представление получившейся файловой системы, в таком формате:

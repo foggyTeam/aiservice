@@ -734,7 +734,7 @@ func (p *Preprocessor) createFileHierarchyDescription(file models.File) string {
 }
 
 // writeFileTree recursively writes the file tree structure
-func (p *Preprocessor) writeFileTree(sb *strings.Builder, files []models.File, depth int) {
+func (p *Preprocessor) writeFileTree(sb *strings.Builder, files []*models.File, depth int) {
 	indent := strings.Repeat("  ", depth)
 
 	for _, file := range files {

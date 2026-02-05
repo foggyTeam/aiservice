@@ -30,11 +30,11 @@ func (y *YandexGPTClient) Summarize(ctx context.Context, parts []*ai.Part) (mode
 	response := models.SummarizeResponse{
 		Element: models.Text{
 			BaseElement: models.BaseElement{
-				Id:    "yandex-mock-element-id",
-				Type:  "text",
-				X:     150,
-				Y:     150,
-				Width: 250,
+				Id:     "yandex-mock-element-id",
+				Type:   "text",
+				X:      150,
+				Y:      150,
+				Width:  250,
 				Height: 120,
 			},
 			Content: "Это фиктивная сводка от Yandex GPT провайдера",
@@ -51,16 +51,18 @@ func (y *YandexGPTClient) Structurize(ctx context.Context, parts []*ai.Part) (mo
 	time.Sleep(120 * time.Millisecond)
 
 	// For demo purposes, return a mock response
+	fileStructure := models.File{
+		Name: "mock-yandex-project",
+		Type: "section",
+		Children: []*models.File{
+			{Name: "main.py", Type: "doc"},
+			{Name: "helpers", Type: "section"},
+		},
+	}
+
 	response := models.StructurizeResponse{
 		AiTreeResponse: "mock-tree-response-from-yandex",
-		File: models.File{
-			Name: "mock-yandex-project",
-			Type: "section",
-			Children: []models.File{
-				{Name: "main.py", Type: "doc"},
-				{Name: "helpers", Type: "section"},
-			},
-		},
+		File:           fileStructure,
 	}
 
 	slog.Info("Yandex GPT mock client processed structurize request")
