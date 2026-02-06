@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -41,29 +40,15 @@ func (g *GeminiClient) Summarize(ctx context.Context, parts []*ai.Part) (models.
 }
 
 func (g *GeminiClient) Structurize(ctx context.Context, parts []*ai.Part) (models.StructurizeResponse, error) {
-	aiResp, err := providers.RunStructurizeGeneration(ctx, g.gkit, parts)
+	file, aiTreeResponse, err := providers.RunStructurizeGenerationAndConvert(ctx, g.gkit, parts)
 	if err != nil {
 		slog.Error("could not generate response:", "err", err)
 		return models.StructurizeResponse{}, err
 	}
 
-	// Convert the file structure JSON string back to models.File
-	var fileStructure models.File
-	if err := json.Unmarshal([]byte(aiResp.FileJSON), &fileStructure); err != nil {
-		slog.Warn("could not unmarshal file structure as JSON, treating as plain text:", "err", err, "response", aiResp.FileJSON)
-
-		// If JSON parsing fails, treat the response as a plain text description
-		// and create a basic file structure based on the text
-		fileStructure = models.File{
-			Name:     "parsed-from-text",
-			Type:     "section",
-			Children: []*models.File{},
-		}
-	}
-
 	return models.StructurizeResponse{
-		AiTreeResponse: aiResp.AiTreeResponse,
-		File:           fileStructure,
+		AiTreeResponse: aiTreeResponse,
+		File:           file,
 	}, nil
 }
 
