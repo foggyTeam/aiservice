@@ -128,9 +128,9 @@ type StructurizeResponse struct {
 }
 
 type File struct {
-	Name     string  `json:"name" example:"main.go"`
-	Type     string  `json:"type" example:"doc"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
-	Children []*File `json:"children"`
+	Name     string `json:"name" example:"main.go"`
+	Type     string `json:"type" example:"doc"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
+	Children []File `json:"children"`
 }
 
 func (f File) IsEmpty() bool {

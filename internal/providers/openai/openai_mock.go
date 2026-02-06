@@ -54,7 +54,7 @@ func (o *OpenAIClient) Structurize(ctx context.Context, parts []*ai.Part) (model
 	fileStructure := models.File{
 		Name: "mock-project",
 		Type: "section",
-		Children: []*models.File{
+		Children: []models.File{
 			{Name: "main.go", Type: "doc"},
 			{Name: "utils", Type: "section"},
 		},

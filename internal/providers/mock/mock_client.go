@@ -38,7 +38,7 @@ func (m *MockClient) Structurize(ctx context.Context, parts []*ai.Part) (models.
 		File: models.File{
 			Name:     "mock_file",
 			Type:     "mock",
-			Children: []*models.File{},
+			Children: []models.File{},
 		},
 	}, nil
 }

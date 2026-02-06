@@ -54,7 +54,7 @@ func (y *YandexGPTClient) Structurize(ctx context.Context, parts []*ai.Part) (mo
 	fileStructure := models.File{
 		Name: "mock-yandex-project",
 		Type: "section",
-		Children: []*models.File{
+		Children: []models.File{
 			{Name: "main.py", Type: "doc"},
 			{Name: "helpers", Type: "section"},
 		},

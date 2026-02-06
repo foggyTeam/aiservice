@@ -64,7 +64,7 @@ func TestPreprocessor(t *testing.T) {
 			File: models.File{
 				Name: "project-root",
 				Type: "section",
-				Children: []*models.File{
+				Children: []models.File{
 					{
 						Name: "src",
 						Type: "section",
@@ -125,11 +125,11 @@ func TestPreprocessor(t *testing.T) {
 				Content: "Key insight",
 			},
 			{
-				Id:    "elem2",
-				Type:  "rectangle",
-				X:     150.0,
-				Y:     20.0,
-				Width: 200.0,
+				Id:     "elem2",
+				Type:   "rectangle",
+				X:      150.0,
+				Y:      20.0,
+				Width:  200.0,
 				Height: 100.0,
 			},
 		}

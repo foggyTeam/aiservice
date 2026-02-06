@@ -60,8 +60,8 @@ func validateFileStructure(file models.File, depth int) error {
 	}
 
 	for _, child := range file.Children {
-		if child != nil {
-			if err := validateFileStructure(*child, depth+1); err != nil {
+		if !child.IsEmpty() {
+			if err := validateFileStructure(child, depth+1); err != nil {
 				return err
 			}
 		}
