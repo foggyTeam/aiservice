@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/aiservice/internal/models"
 	analysis "github.com/aiservice/internal/services/analysis"
@@ -69,6 +72,20 @@ func (h *AnalyzeHandler) Summarize(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, fmt.Errorf("invalid request data: %w", err))
 	}
 
+	// If ImageURL is not empty, download the image from S3 and update the request
+	if req.Board.ImageURL != "" && h.s3Client != nil {
+		imageData, err := h.downloadImageFromS3(c.Request().Context(), req.Board.ImageURL)
+		if err != nil {
+			slog.Error("failed to download image from S3:", "err", err, "url", req.Board.ImageURL)
+			// Continue without the image if download fails
+		} else {
+			// Convert the image to a data URL and update the ImageURL field in the request
+			// This will be picked up by the preprocessing layer
+			req.Board.ImageURL = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imageData)
+			slog.Info("Image downloaded from S3 and converted to data URL", "size", len(imageData))
+		}
+	}
+
 	resp, err := h.service.StartJob(c.Request().Context(), models.NewSumAnalyzeReq(req))
 	if err != nil {
 		if acceptedErr, ok := utils.MapErr[analysis.ErrAccepted](err); ok {
@@ -79,4 +96,29 @@ func (h *AnalyzeHandler) Summarize(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, resp)
 
+}
+
+// downloadImageFromS3 downloads an image from S3 using the provided URL
+func (h *AnalyzeHandler) downloadImageFromS3(ctx context.Context, imageURL string) ([]byte, error) {
+	// Extract the key from the S3 URL
+	// Assuming the URL format is like: https://storage.yandexcloud.net/bucket/key
+	if h.s3Client == nil {
+		return nil, fmt.Errorf("S3 client not initialized")
+	}
+
+	// Extract the key from the URL by removing the base S3 endpoint
+	baseURL := "https://storage.yandexcloud.net/"
+	if after, ok := strings.CutPrefix(imageURL, baseURL); ok {
+		key := after
+		// The key might contain the bucket name, so we need to extract just the actual key
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) == 2 {
+			actualKey := parts[1]
+			return h.s3Client.DownloadFile(ctx, actualKey)
+		}
+	}
+
+	// If the URL doesn't match the expected format, try to use it as a direct key
+	// This assumes the URL is just the key part
+	return h.s3Client.DownloadFile(ctx, imageURL)
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -93,6 +94,20 @@ func (h *AnalyzeHandler) Structurize(c echo.Context) error {
 	if err := validateStructurizeRequest(req); err != nil {
 		slog.Error("validation error:", "err", err)
 		return c.JSON(http.StatusBadRequest, fmt.Errorf("invalid request data: %w", err))
+	}
+
+	// If ImageURL is not empty, download the image from S3 and update the request
+	if req.Board.ImageURL != "" && h.s3Client != nil {
+		imageData, err := h.downloadImageFromS3(c.Request().Context(), req.Board.ImageURL)
+		if err != nil {
+			slog.Error("failed to download image from S3:", "err", err, "url", req.Board.ImageURL)
+			// Continue without the image if download fails
+		} else {
+			// Convert the image to a data URL and update the ImageURL field in the request
+			// This will be picked up by the preprocessing layer
+			req.Board.ImageURL = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imageData)
+			slog.Info("Image downloaded from S3 and converted to data URL", "size", len(imageData))
+		}
 	}
 
 	resp, err := h.service.StartJob(c.Request().Context(), models.NewStructAnalyzeReq(req))

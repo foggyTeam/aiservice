@@ -23,6 +23,7 @@ import (
 	"github.com/aiservice/internal/providers/mock"
 	openaimock "github.com/aiservice/internal/providers/openai"
 	yandexmock "github.com/aiservice/internal/providers/yandex"
+	"github.com/aiservice/internal/s3"
 	"github.com/aiservice/internal/services/analysis"
 	"github.com/aiservice/internal/services/database"
 	jobservice "github.com/aiservice/internal/services/jobService"
@@ -88,6 +89,15 @@ func main() {
 		wrappedStorage = jobStorage // Don't cache in dev to see fresh results
 	}
 
+	// Initialize S3 client
+	s3Client, err := s3.NewYandexS3Client(ctx, cfg.S3.BucketName, cfg.Server.Env)
+	if err != nil {
+		slog.Error("failed to initialize S3 client:", "err", err)
+		if cfg.Server.Env == "prod" {
+			os.Exit(1) // Exit if S3 initialization fails in production
+		}
+	}
+
 	// Create the analysis service without the job queue initially
 	analysisService := analysis.NewAnalysisServiceWithoutJobQueue(cfg.Timeouts.SyncProcess, wrappedLLMClient)
 
@@ -137,6 +147,7 @@ func main() {
 		analysisService,
 		jobQueueService,
 		cfg.Timeouts.SyncProcess,
+		s3Client, // Pass S3 client to the handler
 	)
 
 	e.GET("/health", handlers.HealthHandler)

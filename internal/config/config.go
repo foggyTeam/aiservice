@@ -13,11 +13,18 @@ type Config struct {
 	Job      JobConfig
 	Timeouts TimeoutsConfig
 	Database DatabaseConfig
+	S3       S3Config
 }
 
 type ServerConfig struct {
 	Port string
 	Env  string // "dev", "prod"
+}
+
+type S3Config struct {
+	BucketName string
+	Endpoint   string
+	Region     string
 }
 
 type LLMProviderConfig struct {
@@ -119,6 +126,11 @@ func LoadFromEnv() *Config {
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 			FilePath: getEnv("SQLITE_FILE_PATH", "./aiservice.db"), // Default SQLite file path
 			Debug:    getEnv("DB_DEBUG", "false") == "true",
+		},
+		S3: S3Config{
+			BucketName: getEnv("S3_BUCKET_NAME", "foggy"),
+			Endpoint:   getEnv("S3_ENDPOINT", "https://storage.yandexcloud.net"),
+			Region:     getEnv("S3_REGION", "ru-central1"),
 		},
 	}
 }
