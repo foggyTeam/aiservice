@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aiservice/internal/s3"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/labstack/echo/v4"
@@ -14,17 +15,20 @@ type AnalyzeHandler struct {
 	service     *analysis.AnalysisService
 	jobQueue    *jobservice.JobQueueService
 	syncTimeout time.Duration
+	s3Client    *s3.YandexS3Client
 }
 
 func NewAnalyzeHandler(
 	service *analysis.AnalysisService,
 	jobQueue *jobservice.JobQueueService,
 	syncTimeout time.Duration,
+	s3Client *s3.YandexS3Client,
 ) *AnalyzeHandler {
 	return &AnalyzeHandler{
 		service:     service,
 		jobQueue:    jobQueue,
 		syncTimeout: syncTimeout,
+		s3Client:    s3Client,
 	}
 }
 
