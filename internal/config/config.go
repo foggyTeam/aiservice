@@ -17,8 +17,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port string
-	Env  string // "dev", "prod"
+	Port            string
+	Env             string // "dev", "prod"
+	VerificationKey string // API key for authentication
 }
 
 type S3Config struct {
@@ -28,7 +29,7 @@ type S3Config struct {
 }
 
 type LLMProviderConfig struct {
-	Provider string // "openai", "qwen", "anthropic"
+	Provider string // "ollama", "openai", "qwen", "anthropic"
 	APIKey   string
 	BaseURL  string
 	Model    string
@@ -84,25 +85,34 @@ type DatabaseConfig struct {
 }
 
 func LoadFromEnv() *Config {
+	provider := getEnv("LLM_PROVIDER", "ollama")
+
+	// Set defaults based on provider
+	var baseURL, model string
+	switch provider {
+	case "ollama":
+		baseURL = getEnv("OLLAMA_BASE_URL", "http://localhost:11434")
+		model = getEnv("LLM_MODEL", "gemma3")
+	case "gemini":
+		baseURL = getEnv("GEMINI_BASE_URL", "")
+		model = getEnv("LLM_MODEL", "googleai/gemini-2.5-flash")
+	default:
+		baseURL = getEnv("LLM_BASE_URL", "")
+		model = getEnv("LLM_MODEL", "")
+	}
+
 	return &Config{
 		Server: ServerConfig{
-			Port: getEnv("PORT", "8080"),
-			Env:  getEnv("ENV", "dev"),
+			Port:            getEnv("PORT", "8080"),
+			Env:             getEnv("ENV", "dev"),
+			VerificationKey: getEnv("VERIFICATION_KEY", ""),
 		},
 		LLM: LLMProviderConfig{
-			// Provider: getEnv("LLM_PROVIDER", "openai"),
-			// APIKey:   getEnv("LLM_API_KEY", ""),
-			// BaseURL:  getEnv("LLM_BASE_URL", "https://api.openai.com/v1"),
-			Timeout:  getDurationEnv("LLM_TIMEOUT", 20*time.Second),
-			Model:    getEnv("LLM_MODEL", "googleai/gemini-2.5-flash"),
-			Provider: getEnv("LLM_PROVIDER", "gemini"),
-			APIKey:   getEnv("GEMINI_API_KEY", ""),
-		},
-		OCR: OCRProviderConfig{
-			Provider: getEnv("OCR_PROVIDER", "gemini"),
-			APIKey:   getEnv("OCR_API_KEY", ""),
-			BaseURL:  getEnv("OCR_BASE_URL", ""),
-			Timeout:  getDurationEnv("OCR_TIMEOUT", 8*time.Second),
+			Provider: provider,
+			APIKey:   getEnv("LLM_API_KEY", ""),
+			BaseURL:  baseURL,
+			Model:    model,
+			Timeout:  getDurationEnv("LLM_TIMEOUT", time.Minute*2),
 		},
 		Job: JobConfig{
 			QueueSize:     getIntEnv("JOB_QUEUE_SIZE", 100),

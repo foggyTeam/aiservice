@@ -6,13 +6,19 @@ import (
 	"fmt"
 
 	"github.com/aiservice/internal/models"
-
 	"github.com/aiservice/internal/providers"
+	"github.com/aiservice/internal/services/image"
 )
 
 type PipelineState struct {
-	AnalyzeRequest  models.AnalyzeRequest
-	AnalyzeResponse models.AnalyzeResponse
+	AnalyzeRequest      models.AnalyzeRequest
+	AnalyzeResponse     models.AnalyzeResponse
+	DigitalInkText      string
+	ImageURI            string
+	ImageDownloadResult *image.DownloadResult
+	Provider            string
+	SummarizeFlow       providers.SummarizeFlow
+	StructurizeFlow     providers.StructurizeFlow
 }
 
 type Step func(ctx context.Context, state *PipelineState) error
@@ -34,12 +40,23 @@ func (p *Pipeline) Execute(ctx context.Context, state *PipelineState) error {
 	return nil
 }
 
-func BuildPipeline(t string, llm providers.LLMClient) (*Pipeline, error) {
+func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipeline, error) {
 	switch t {
 	case models.SummarizeType:
-		return NewPipeline(newSummarizeStep(llm)), nil
+		return NewPipeline(
+			newImageDownloadStep(),
+			newDigitalInkAnalysisStep(),
+			newSummarizeStep(llm),
+			newFillSummarizeResponseStep(),
+			newImageCleanupStep(),
+		), nil
 	case models.StructurizeType:
-		return NewPipeline(newStructurizeStep(llm)), nil
+		return NewPipeline(
+			newImageDownloadStep(),
+			newStructurizeStep(llm),
+			newFillStructurizeResponseStep(),
+			newImageCleanupStep(),
+		), nil
 	default:
 		return nil, fmt.Errorf("unsupported input type: %s", t)
 	}

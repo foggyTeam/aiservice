@@ -8,6 +8,7 @@ import (
 
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/providers"
+	"github.com/aiservice/internal/services/image"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/pipeline"
 	"github.com/aiservice/internal/utils"
@@ -22,24 +23,30 @@ func (e ErrAccepted) Error() string {
 }
 
 type AnalysisService struct {
-	llm       providers.LLMClient
-	timeout   time.Duration
-	jobQueue  *jobservice.JobQueueService
+	llm          providers.LLMClient
+	timeout      time.Duration
+	jobQueue     *jobservice.JobQueueService
+	imageService *image.Service
+	provider     string
 }
 
-func NewAnalysisService(timeout time.Duration, llm providers.LLMClient, jobQueue *jobservice.JobQueueService) *AnalysisService {
+func NewAnalysisService(timeout time.Duration, llm providers.LLMClient, jobQueue *jobservice.JobQueueService, imageService *image.Service, provider string) *AnalysisService {
 	return &AnalysisService{
-		timeout:  timeout,
-		llm:      llm,
-		jobQueue: jobQueue,
+		timeout:      timeout,
+		llm:          llm,
+		jobQueue:     jobQueue,
+		imageService: imageService,
+		provider:     provider,
 	}
 }
 
 // Alternative constructor for when job queue is set later
-func NewAnalysisServiceWithoutJobQueue(timeout time.Duration, llm providers.LLMClient) *AnalysisService {
+func NewAnalysisServiceWithoutJobQueue(timeout time.Duration, llm providers.LLMClient, imageService *image.Service, provider string) *AnalysisService {
 	return &AnalysisService{
-		timeout: timeout,
-		llm:     llm,
+		timeout:      timeout,
+		llm:          llm,
+		imageService: imageService,
+		provider:     provider,
 	}
 }
 
@@ -106,13 +113,23 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 }
 
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
-	p, err := pipeline.BuildPipeline(req.RequestType, s.llm)
+	// Set image service in pipeline
+	pipeline.SetImageService(s.imageService)
+
+	// Build pipeline state
+	state := &pipeline.PipelineState{
+		AnalyzeRequest: req,
+		Provider:       s.provider,
+	}
+
+	p, err := pipeline.BuildPipeline(req.RequestType, s.llm, s.provider)
 	if err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("failed to build pipeline: %w", err)
 	}
-	state := &pipeline.PipelineState{AnalyzeRequest: req}
+
 	if err := p.Execute(ctx, state); err != nil {
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
+
 	return state.AnalyzeResponse, nil
 }

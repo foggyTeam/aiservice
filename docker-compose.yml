@@ -1,5 +1,30 @@
 version: "3.8"
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    profiles: ["ollama"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command:
+      - "-c"
+      - |
+        ollama serve > /dev/null 2>&1 &
+        sleep 5
+        ollama pull gemma3
+        wait
+
   app:
     build: .
     image: aiservice:latest
@@ -10,14 +35,23 @@ services:
     environment:
       - DB_TYPE=${DB_TYPE:-memory}
       - SQLITE_FILE_PATH=${SQLITE_FILE_PATH:-/app/data/aiservice.db}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - IMAGES_DIR=/app/images
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-gemma3}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - images_volume:/app/images
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway" # позволяет контейнеру обращаться к сервисам на хосте (Linux)
+    command: ["--provider", "${LLM_PROVIDER:-ollama}"]
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:${SERVER_PORT:-8080}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+volumes:
+  ollama_data:
+  images_volume:

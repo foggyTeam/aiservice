@@ -20,5 +20,8 @@ EXPOSE 8080
 ENV SERVER_PORT=8080
 # non-root user
 RUN addgroup -S app && adduser -S -G app app
+# Create images directory and set permissions
+RUN mkdir -p /app/images && chown -R app:app /app/images
 USER app
 ENTRYPOINT ["/usr/local/bin/aiservice"]
+CMD []
