@@ -14,8 +14,8 @@ import (
 type OllamaClient struct {
 	cfg         config.LLMProviderConfig
 	gkit        *genkit.Genkit
-	textModel   ai.Model  // для суммаризации (gemma3:4b)
-	visionModel ai.Model  // для распознавания изображений (gemma3:12b)
+	textModel   ai.Model // для суммаризации (gemma3:4b)
+	visionModel ai.Model // для распознавания изображений (gemma3:12b)
 }
 
 func NewOllamaClient(ctx context.Context, cfg config.LLMProviderConfig) *OllamaClient {
@@ -72,12 +72,13 @@ func (o *OllamaClient) Summarize(ctx context.Context, parts []*ai.Part) (provide
 	resp, err := genkit.Generate(ctx, o.gkit,
 		ai.WithModel(o.textModel),
 		ai.WithMessages(ai.NewUserMessage(parts...)),
-		ai.WithOutputType(providers.SummarizeFlow{}),
+		ai.WithOutputType(&providers.SummarizeFlow{}),
 	)
 	if err != nil {
 		slog.Error("could not generate summarization:", "err", err)
 		return providers.SummarizeFlow{}, err
 	}
+
 	var summarizeFlow providers.SummarizeFlow
 	if err := resp.Output(&summarizeFlow); err != nil {
 		slog.Error("could not parse summarization output:", "err", err)
@@ -90,7 +91,7 @@ func (o *OllamaClient) Structurize(ctx context.Context, parts []*ai.Part) (provi
 	resp, err := genkit.Generate(ctx, o.gkit,
 		ai.WithModel(o.textModel),
 		ai.WithMessages(ai.NewUserMessage(parts...)),
-		ai.WithOutputType(providers.StructurizeFlow{}),
+		ai.WithOutputType(&providers.StructurizeFlow{}),
 	)
 	if err != nil {
 		slog.Error("could not generate structurization:", "err", err)

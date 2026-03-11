@@ -135,6 +135,5 @@ func RunStructurizeGenerationAndConvert(ctx context.Context, gkit *genkit.Genkit
 
 // StructurizeFlow represents the output structure for structurization (used in pipeline)
 type StructurizeFlow struct {
-	AiTreeResponse string        `json:"aiTreeResponse"`
-	File           FileHierarchy `json:"file"`
+	AiTreeResponse string `json:"aiTreeResponse"`
 }

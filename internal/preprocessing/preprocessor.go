@@ -1,7 +1,6 @@
 package preprocessing
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -9,16 +8,29 @@ import (
 	"github.com/firebase/genkit/go/ai"
 )
 
-const ImageRecognitionPrompt = `What do you see in the picture?`
+const ImageRecognitionPrompt = `
+Что ты видишь на доске?
+Опиши всё, что видишь: текст, графы, схемы, рисунки и другие элементы.
+
+Ответ верни в формате JSON:
+{
+  "imageDescription": "Всё, что ты видишь на доске"
+}
+`
 
 const SummarizePrompt = `
 Тебе предоставлено описание содержимого доски:
 1. IMAGE DESCRIPTION - описание того, что видно на изображении доски
-2. DIGITAL INK DATA - распознанный текст из рукописных заметок доски
+2. DIGITAL INK DATA - распознанный текст из рукописных заметок
 
 Твоя задача:
 1) Проанализируй всё предоставленное описание
-2) Создай краткую суммаризацию ключевых выводов и заключений пользователей
+2) Создай краткую суммаризацию ключевых выводов и заключений
+
+Мне нужно, чтобы ты предоставил ответ в следующем формате JSON:
+{
+  "summarization": "Краткое содержание того, к чему пришли пользователи на доске"
+}
 
 Требования к суммаризации:
 - Content - это html тип, который ограничен следующими тегами: <p>, <br>, <strong>, <em>, <ul>, <ol>, <li>
@@ -27,15 +39,13 @@ const SummarizePrompt = `
 `
 
 const StructurizePrompt = `
-Тебе нужно следовать строго моей инструкции.
-Тебе предоставлены:
-1. DIGITAL INK DATA - текст, распознанный из рукописных заметок пользователей на доске
-2. Изображение доски - скриншот для визуальной сверки
+Тебе предоставлено описание содержимого доски:
+1. IMAGE DESCRIPTION - описание того, что видно на изображении доски (текст, графы, схемы, рисунки)
+2. DIGITAL INK DATA - текст из рукописных заметок
 
 Твоя задача:
-1) Проанализируй распознанный текст из рукописных заметок (DIGITAL INK DATA)
-2) Сверься с изображением доски для понимания контекста
-3) Создай файловую структуру проекта на основе содержимого доски
+1) Проанализируй всё предоставленное описание
+2) Создай файловую структуру проекта на основе содержимого доски
 
 Мне нужно, чтобы ты предоставил ответ в следующем формате JSON:
 {
@@ -90,52 +100,19 @@ func (p *Preprocessor) PreprocessSummarizeRequest(req models.SummarizeRequest, r
 }
 
 // PreprocessStructurizeRequest transforms a raw structurize request into a structured format
-func (p *Preprocessor) PreprocessStructurizeRequest(req models.StructurizeRequest) ([]*ai.Part, error) {
-	// Check for potential memory issues
-	if len(req.Board.Elements) > 1000 {
-		return nil, fmt.Errorf("too many elements in board, maximum allowed is 1000")
-	}
-
-	// Preserve raw data
-	rawData, err := json.Marshal(req.Board)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal raw board data: %w", err)
-	}
-
-	// Check if the marshaled data is too large
-	if len(rawData) > 10*1024*1024 { // 10MB limit
-		return nil, fmt.Errorf("board data too large, maximum allowed is 10MB")
-	}
-
-	// Create a structured representation of the file hierarchy
-	fileStructure := p.createFileHierarchyDescription(req.File)
-
-	// Check if combined analysis is too large
-	totalSize := len(rawData) + len(fileStructure)
-	if totalSize > 20*1024*1024 { // 20MB limit for combined analysis
-		return nil, fmt.Errorf("combined analysis data too large, maximum allowed is 20MB")
-	}
-
-	// Combine raw data with file hierarchy description
-	structuredPrompt := fmt.Sprintf(`PROJECT STRUCTURIZATION REQUEST:
-%s
-
-FILE HIERARCHY REQUESTED:
-%s
-
-RAW BOARD DATA:
-%s
-
-%s`,
-		req.RequestType, fileStructure, string(rawData), StructurizePrompt)
-
+func (p *Preprocessor) PreprocessStructurizeRequest(imageDescription string, inkData string) ([]*ai.Part, error) {
 	parts := []*ai.Part{
-		ai.NewTextPart(structuredPrompt),
+		ai.NewTextPart(StructurizePrompt),
 	}
 
-	// Add image if available
-	if req.Board.ImageURL != "" {
-		parts = append(parts, ai.NewMediaPart("image/jpeg", req.Board.ImageURL))
+	// Add image description if available
+	if imageDescription != "" {
+		parts = append(parts, ai.NewTextPart("\n\nIMAGE DESCRIPTION:\n"+imageDescription))
+	}
+
+	// Add ink data if available
+	if inkData != "" {
+		parts = append(parts, ai.NewTextPart("\n\nDIGITAL INK DATA:\n"+inkData))
 	}
 
 	return parts, nil

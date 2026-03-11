@@ -55,6 +55,8 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 	case models.StructurizeType:
 		return NewPipeline(
 			newImageDownloadStep(),
+			newDigitalInkAnalysisStep(),
+			newImageRecognitionStep(llm),
 			newStructurizeStep(llm),
 			newFillStructurizeResponseStep(),
 			newImageCleanupStep(),

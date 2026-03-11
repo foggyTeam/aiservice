@@ -31,10 +31,6 @@ func SetImageService(svc *image.Service) {
 	imageService = svc
 }
 
-func newLlmStructurizeParts(req models.StructurizeRequest) ([]*ai.Part, error) {
-	return preprocessor.PreprocessStructurizeRequest(req)
-}
-
 func newImageDownloadStep() Step {
 	return func(ctx context.Context, state *PipelineState) error {
 		// Get image URL from request
@@ -232,15 +228,19 @@ func createTextElementFromSummarization(summarization string, state *PipelineSta
 
 func newStructurizeStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		parts, err := newLlmStructurizeParts(state.AnalyzeRequest.StructurizeRequest)
+		parts, err := preprocessor.PreprocessStructurizeRequest(
+			state.ImageRecognitionFlow.ImageDescription,
+			state.DigitalInkText,
+		)
 		if err != nil {
 			return err
 		}
+
 		resp, err := llm.Structurize(ctx, parts)
 		if err != nil {
 			return err
 		}
-		// Store the structurization result in state
+
 		state.StructurizeFlow = resp
 		return nil
 	}
@@ -254,8 +254,11 @@ func newFillStructurizeResponseStep() Step {
 }
 
 func fillStructRespWithMeta(flow providers.StructurizeFlow, state *PipelineState) models.StructurizeResponse {
-	// Convert FileHierarchy to models.File using existing ToModelFile method
-	modelFile := flow.File.ToModelFile()
+	// Parse ASCII tree into FileHierarchy
+	fileHierarchy := utils.ParseASCIITree(flow.AiTreeResponse)
+
+	// Convert FileHierarchy to models.File
+	modelFile := utils.ToModelFile(fileHierarchy)
 
 	return models.StructurizeResponse{
 		RequestID:      state.AnalyzeRequest.StructurizeRequest.RequestID,
