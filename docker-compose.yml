@@ -22,7 +22,8 @@ services:
       - |
         ollama serve > /dev/null 2>&1 &
         sleep 5
-        ollama pull gemma3
+        ollama pull ${LLM_VISION_MODEL:-gemma3:12b}
+        ollama pull ${LLM_TEXT_MODEL:-gemma3:4b}
         wait
 
   app:
@@ -38,8 +39,8 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - IMAGES_DIR=/app/images
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-gemma3}
+      - LLM_TEXT_MODEL=${LLM_TEXT_MODEL:-gemma3:4b}
+      - LLM_VISION_MODEL=${LLM_VISION_MODEL:-gemma3:12b}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

@@ -191,7 +191,7 @@ func initLLMProviders(ctx context.Context, cfg *config.Config) providers.LLMClie
 			slog.Error("Please set GEMINI_API_KEY environment variable or use --provider ollama")
 			os.Exit(1)
 		}
-		slog.Info("Initializing Gemini provider", "model", cfg.LLM.Model)
+		slog.Info("Initializing Gemini provider", "text_model", cfg.LLM.TextModel, "vision_model", cfg.LLM.VisionModel)
 		return gemini.NewGeminiClient(ctx, cfg.LLM)
 
 	case "ollama":
@@ -207,6 +207,9 @@ func initOllama(ctx context.Context, cfg *config.Config) providers.LLMClient {
 		slog.Error("Please set OLLAMA_BASE_URL environment variable (e.g., http://localhost:11434)")
 		os.Exit(1)
 	}
-	slog.Info("Initializing Ollama provider", "model", cfg.LLM.Model, "url", cfg.LLM.BaseURL)
+	slog.Info("Initializing Ollama provider", 
+		"text_model", cfg.LLM.TextModel, 
+		"vision_model", cfg.LLM.VisionModel,
+		"url", cfg.LLM.BaseURL)
 	return ollama.NewOllamaClient(ctx, cfg.LLM)
 }

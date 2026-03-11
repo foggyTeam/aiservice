@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/aiservice/internal/digitalink"
 	"github.com/aiservice/internal/models"
@@ -28,10 +29,6 @@ var imageService *image.Service
 // SetImageService sets the image service for the pipeline
 func SetImageService(svc *image.Service) {
 	imageService = svc
-}
-
-func newLlmSummarizeParts(req models.SummarizeRequest, recognizedText string, imageURI string) ([]*ai.Part, error) {
-	return preprocessor.PreprocessSummarizeRequest(req, recognizedText, imageURI)
 }
 
 func newLlmStructurizeParts(req models.StructurizeRequest) ([]*ai.Part, error) {
@@ -136,21 +133,53 @@ func extractLineElements(elements []models.Element) []models.Element {
 	return lineElements
 }
 
+func newImageRecognitionStep(llm providers.LLMClient) Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		parts := []*ai.Part{
+			ai.NewTextPart(preprocessing.ImageRecognitionPrompt),
+		}
+
+		// Add image if available
+		if state.ImageURI != "" {
+			parts = append(parts, ai.NewMediaPart("image/jpeg", state.ImageURI))
+		}
+
+		resp, err := llm.ImageRecognition(ctx, parts)
+		if err != nil {
+			slog.Warn("image recognition failed", "err", err)
+			return nil
+		}
+
+		state.ImageRecognitionFlow = resp
+		return nil
+	}
+}
+
 func newSummarizeStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		parts, err := newLlmSummarizeParts(
-			state.AnalyzeRequest.SummarizeRequest,
-			state.DigitalInkText,
-			state.ImageURI,
-		)
-		if err != nil {
-			return err
+		var combinedText strings.Builder
+
+		if state.ImageRecognitionFlow.ImageDescription != "" {
+			combinedText.WriteString("IMAGE DESCRIPTION:\n")
+			combinedText.WriteString(state.ImageRecognitionFlow.ImageDescription)
+			combinedText.WriteString("\n\n")
 		}
+
+		if state.DigitalInkText != "" {
+			combinedText.WriteString("DIGITAL INK DATA:\n")
+			combinedText.WriteString(state.DigitalInkText)
+		}
+
+		parts := []*ai.Part{
+			ai.NewTextPart(preprocessing.SummarizePrompt),
+			ai.NewTextPart("\n\nTEXT FROM BOARD:\n" + combinedText.String()),
+		}
+
 		resp, err := llm.Summarize(ctx, parts)
 		if err != nil {
 			return err
 		}
-		// Store the summarization result in state
+
 		state.SummarizeFlow = resp
 		return nil
 	}

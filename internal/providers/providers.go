@@ -10,11 +10,18 @@ import (
 )
 
 type LLMClient interface {
-	Structurize(ctx context.Context, parts []*ai.Part) (StructurizeFlow, error)
+	ImageRecognition(ctx context.Context, parts []*ai.Part) (ImageRecognitionFlow, error)
 	Summarize(ctx context.Context, parts []*ai.Part) (SummarizeFlow, error)
+	Structurize(ctx context.Context, parts []*ai.Part) (StructurizeFlow, error)
 	GetName() string // Added for provider identification
 }
 
+// ImageRecognitionFlow represents the output structure for image recognition
+type ImageRecognitionFlow struct {
+	ImageDescription string `json:"imageDescription"`
+}
+
+// SummarizeFlow represents the output structure for summarization
 type SummarizeFlow struct {
 	Summarization string `json:"summarization"`
 }
@@ -105,7 +112,7 @@ func RunStructurizeGeneration(ctx context.Context, gkit *genkit.Genkit, parts []
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate llm request: %w", err)
 	}
-	
+
 	var flow SimpleStructurizeFlow
 	if err := resp.Output(&flow); err != nil {
 		return nil, fmt.Errorf("failed to parse output: %w", err)

@@ -29,11 +29,12 @@ type S3Config struct {
 }
 
 type LLMProviderConfig struct {
-	Provider string // "ollama", "openai", "qwen", "anthropic"
-	APIKey   string
-	BaseURL  string
-	Model    string
-	Timeout  time.Duration
+	Provider     string // "ollama", "gemini", "yandex"
+	APIKey       string
+	BaseURL      string
+	TextModel    string // модель для суммаризации (текстовая)
+	VisionModel  string // модель для распознавания изображений
+	Timeout      time.Duration
 }
 
 type MultiProviderConfig struct {
@@ -88,17 +89,20 @@ func LoadFromEnv() *Config {
 	provider := getEnv("LLM_PROVIDER", "ollama")
 
 	// Set defaults based on provider
-	var baseURL, model string
+	var baseURL, textModel, visionModel string
 	switch provider {
 	case "ollama":
 		baseURL = getEnv("OLLAMA_BASE_URL", "http://localhost:11434")
-		model = getEnv("LLM_MODEL", "gemma3")
+		textModel = getEnv("LLM_TEXT_MODEL", "gemma3:4b")
+		visionModel = getEnv("LLM_VISION_MODEL", "gemma3:12b")
 	case "gemini":
 		baseURL = getEnv("GEMINI_BASE_URL", "")
-		model = getEnv("LLM_MODEL", "googleai/gemini-2.5-flash")
+		textModel = getEnv("LLM_TEXT_MODEL", "googleai/gemini-2.5-flash")
+		visionModel = getEnv("LLM_VISION_MODEL", "googleai/gemini-2.5-flash")
 	default:
 		baseURL = getEnv("LLM_BASE_URL", "")
-		model = getEnv("LLM_MODEL", "")
+		textModel = getEnv("LLM_TEXT_MODEL", "")
+		visionModel = getEnv("LLM_VISION_MODEL", "")
 	}
 
 	return &Config{
@@ -108,11 +112,12 @@ func LoadFromEnv() *Config {
 			VerificationKey: getEnv("VERIFICATION_KEY", ""),
 		},
 		LLM: LLMProviderConfig{
-			Provider: provider,
-			APIKey:   getEnv("LLM_API_KEY", ""),
-			BaseURL:  baseURL,
-			Model:    model,
-			Timeout:  getDurationEnv("LLM_TIMEOUT", time.Minute*2),
+			Provider:    provider,
+			APIKey:      getEnv("LLM_API_KEY", ""),
+			BaseURL:     baseURL,
+			TextModel:   textModel,
+			VisionModel: visionModel,
+			Timeout:     getDurationEnv("LLM_TIMEOUT", time.Minute*2),
 		},
 		Job: JobConfig{
 			QueueSize:     getIntEnv("JOB_QUEUE_SIZE", 100),

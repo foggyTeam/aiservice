@@ -11,14 +11,15 @@ import (
 )
 
 type PipelineState struct {
-	AnalyzeRequest      models.AnalyzeRequest
-	AnalyzeResponse     models.AnalyzeResponse
-	DigitalInkText      string
-	ImageURI            string
-	ImageDownloadResult *image.DownloadResult
-	Provider            string
-	SummarizeFlow       providers.SummarizeFlow
-	StructurizeFlow     providers.StructurizeFlow
+	AnalyzeRequest       models.AnalyzeRequest
+	AnalyzeResponse      models.AnalyzeResponse
+	DigitalInkText       string
+	ImageURI             string
+	ImageDownloadResult  *image.DownloadResult
+	Provider             string
+	ImageRecognitionFlow providers.ImageRecognitionFlow
+	SummarizeFlow        providers.SummarizeFlow
+	StructurizeFlow      providers.StructurizeFlow
 }
 
 type Step func(ctx context.Context, state *PipelineState) error
@@ -46,6 +47,7 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 		return NewPipeline(
 			newImageDownloadStep(),
 			newDigitalInkAnalysisStep(),
+			newImageRecognitionStep(llm),
 			newSummarizeStep(llm),
 			newFillSummarizeResponseStep(),
 			newImageCleanupStep(),
