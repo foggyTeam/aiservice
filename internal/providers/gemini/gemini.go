@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/aiservice/internal/config"
+	"github.com/aiservice/internal/preprocessing"
 	"github.com/aiservice/internal/providers"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -33,9 +34,17 @@ func NewGeminiClient(ctx context.Context, cfg config.LLMProviderConfig) *GeminiC
 }
 
 func (g *GeminiClient) Summarize(ctx context.Context, parts []*ai.Part) (providers.SummarizeFlow, error) {
+	// System message - fixed instructions
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.SummarizeSystemPrompt),
+	)
+
+	// User message - dynamic data
+	userMsg := ai.NewUserMessage(parts...)
+
 	resp, err := genkit.Generate(ctx, g.gkit,
-		ai.WithMessages(ai.NewUserMessage(parts...)),
-		ai.WithOutputType(providers.SummarizeFlow{}),
+		ai.WithMessages(systemMsg, userMsg),
+		ai.WithOutputType(&providers.SummarizeFlow{}),
 	)
 	if err != nil {
 		slog.Error("could not generate summarization:", "err", err)
@@ -52,10 +61,16 @@ func (g *GeminiClient) Summarize(ctx context.Context, parts []*ai.Part) (provide
 }
 
 func (g *GeminiClient) Structurize(ctx context.Context, parts []*ai.Part) (providers.StructurizeFlow, error) {
-	prompt := ai.NewUserMessage(parts...)
+	// System message - fixed instructions
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.StructurizeSystemPrompt),
+	)
+
+	// User message - dynamic data
+	userMsg := ai.NewUserMessage(parts...)
 
 	resp, err := genkit.Generate(ctx, g.gkit,
-		ai.WithMessages(prompt),
+		ai.WithMessages(systemMsg, userMsg),
 		ai.WithOutputType(&providers.StructurizeFlow{}),
 	)
 	if err != nil {
@@ -74,6 +89,33 @@ func (g *GeminiClient) Structurize(ctx context.Context, parts []*ai.Part) (provi
 
 func (g *GeminiClient) GetName() string {
 	return "gemini"
+}
+
+func (g *GeminiClient) GenerateTemplate(ctx context.Context, parts []*ai.Part) (providers.TemplateGenerationFlow, error) {
+	// System message - fixed instructions
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.GenerateTemplatePrompt),
+	)
+
+	// User message - dynamic data
+	userMsg := ai.NewUserMessage(parts...)
+
+	resp, err := genkit.Generate(ctx, g.gkit,
+		ai.WithMessages(systemMsg, userMsg),
+		ai.WithOutputType(&providers.TemplateGenerationFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate template:", "err", err)
+		return providers.TemplateGenerationFlow{}, err
+	}
+
+	var templateFlow providers.TemplateGenerationFlow
+	if err := resp.Output(&templateFlow); err != nil {
+		slog.Error("could not parse template output:", "err", err)
+		return providers.TemplateGenerationFlow{}, err
+	}
+
+	return templateFlow, nil
 }
 
 func (g *GeminiClient) ImageRecognition(ctx context.Context, parts []*ai.Part) (providers.ImageRecognitionFlow, error) {

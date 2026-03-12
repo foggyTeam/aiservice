@@ -13,6 +13,7 @@ type LLMClient interface {
 	ImageRecognition(ctx context.Context, parts []*ai.Part) (ImageRecognitionFlow, error)
 	Summarize(ctx context.Context, parts []*ai.Part) (SummarizeFlow, error)
 	Structurize(ctx context.Context, parts []*ai.Part) (StructurizeFlow, error)
+	GenerateTemplate(ctx context.Context, parts []*ai.Part) (TemplateGenerationFlow, error)
 	GetName() string // Added for provider identification
 }
 
@@ -24,6 +25,53 @@ type ImageRecognitionFlow struct {
 // SummarizeFlow represents the output structure for summarization
 type SummarizeFlow struct {
 	Summarization string `json:"summarization"`
+}
+
+// TemplateGenerationFlow represents the output structure for template generation
+type TemplateGenerationFlow struct {
+	BoardType    string            `json:"boardType"`
+	Title        string            `json:"title"`
+	Description  string            `json:"description"`
+	Elements     []TemplateElement `json:"elements,omitempty"`
+	GraphNodes   []TemplateNode    `json:"graphNodes,omitempty"`
+	GraphEdges   []TemplateEdge    `json:"graphEdges,omitempty"`
+}
+
+// TemplateElement represents a board element for simple board
+type TemplateElement struct {
+	Type         string  `json:"type"`
+	X            float32 `json:"x"`
+	Y            float32 `json:"y"`
+	Width        float32 `json:"width"`
+	Height       float32 `json:"height"`
+	Rotation     float32 `json:"rotation"`
+	Fill         string  `json:"fill,omitempty"`
+	Stroke       string  `json:"stroke,omitempty"`
+	StrokeWidth  int     `json:"strokeWidth,omitempty"`
+	Content      string  `json:"content,omitempty"`
+	CornerRadius int     `json:"cornerRadius,omitempty"`
+}
+
+// TemplateNode represents a graph node for graph board
+type TemplateNode struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	PositionX   float32 `json:"positionX"`
+	PositionY   float32 `json:"positionY"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	Shape       string `json:"shape"`
+	Color       string `json:"color,omitempty"`
+	URL         string `json:"url,omitempty"`
+}
+
+// TemplateEdge represents a graph edge for graph board
+type TemplateEdge struct {
+	ID     string `json:"id"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Type   string `json:"type"`
+	Label  string `json:"label,omitempty"`
 }
 
 // For structurize, we'll define a flow that doesn't use the recursive File structure in its definition

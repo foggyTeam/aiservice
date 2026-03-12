@@ -65,8 +65,18 @@ func main() {
 
 	llmClient := initLLMProviders(ctx, cfg)
 
-	// Initialize cache for job storage
+	// Initialize cache
 	appCache := cache.NewInMemoryCache()
+
+	// Wrap LLM client with caching if enabled (prod mode only)
+	var wrappedLLMClient providers.LLMClient
+	if cfg.Server.Env == "prod" {
+		wrappedLLMClient = cache.NewCachedLLMClient(llmClient, appCache)
+		slog.Info("LLM caching enabled (prod mode)", "ttl", "30m", "maxSize", "1GB")
+	} else {
+		wrappedLLMClient = llmClient
+		slog.Info("LLM caching disabled (dev mode)")
+	}
 
 	jobStorage, err := database.NewStorage(cfg.Database)
 	if err != nil {
@@ -94,7 +104,7 @@ func main() {
 	imageService := image.NewService(os.Getenv("IMAGES_DIR"), 5*time.Minute)
 
 	// Create the analysis service without the job queue initially
-	analysisService := analysis.NewAnalysisServiceWithoutJobQueue(cfg.Timeouts.SyncProcess, llmClient, imageService, cfg.LLM.Provider)
+	analysisService := analysis.NewAnalysisServiceWithoutJobQueue(cfg.Timeouts.SyncProcess, wrappedLLMClient, imageService, cfg.LLM.Provider)
 
 	// Create the job queue service with the analysis service as the processor
 	jobQueueService := jobservice.NewJobQueueService(

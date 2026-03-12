@@ -78,7 +78,9 @@ type GoogleCandidate struct {
 func main() {
 	// Parse command line flags
 	boardID := flag.String("board", "69a7f58476e8c3b1fb9705c1", "Board ID to fetch from foggy backend")
-	mode := flag.String("mode", "summarize", "Mode: summarize or structurize")
+	mode := flag.String("mode", "summarize", "Mode: summarize, structurize, or template")
+	prompt := flag.String("prompt", "", "Prompt for template generation (required for template mode)")
+	boardType := flag.String("board-type", "simple", "Board type for template: simple or graph (default: simple)")
 	foggyURL := flag.String("foggy-url", "http://localhost:3001", "Foggy backend URL")
 	aiServiceURL := flag.String("ai-url", "http://localhost:8080", "AIService URL")
 	userID := flag.String("user", "parser-user", "User ID for the request")
@@ -86,6 +88,17 @@ func main() {
 	google := flag.Bool("google", false, "Use Google Handwriting API instead of AIService")
 	googleLang := flag.String("google-lang", "en", "Google Handwriting API language code")
 	flag.Parse()
+
+	// Validate template mode parameters
+	if *mode == "template" && *prompt == "" {
+		fmt.Fprintf(os.Stderr, "Error: -prompt is required for template mode\n")
+		os.Exit(1)
+	}
+
+	if *mode == "template" && *boardType != "simple" && *boardType != "graph" {
+		fmt.Fprintf(os.Stderr, "Error: -board-type must be 'simple' or 'graph'\n")
+		os.Exit(1)
+	}
 
 	fmt.Printf("Fetching board %s from %s...\n", *boardID, *foggyURL)
 
@@ -176,7 +189,7 @@ func main() {
 			}
 			aiReqBody, _ = json.Marshal(sumReq)
 			requestType = "summarize"
-		} else {
+		} else if *mode == "structurize" {
 			structReq := models.StructurizeRequest{
 				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
 				UserID:      *userID,
@@ -194,6 +207,17 @@ func main() {
 			}
 			aiReqBody, _ = json.Marshal(structReq)
 			requestType = "structurize"
+		} else if *mode == "template" {
+			templateReq := models.GenerateTemplateRequest{
+				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
+				UserID:      *userID,
+				RequestType: "generateTemplate",
+				BoardID:     foggyBoard.ID,
+				Prompt:      *prompt,
+				BoardType:   models.BoardType(*boardType),
+			}
+			aiReqBody, _ = json.Marshal(templateReq)
+			requestType = "template"
 		}
 
 		// Send to AIService

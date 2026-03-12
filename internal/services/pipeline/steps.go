@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/aiservice/internal/digitalink"
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/preprocessing"
 	"github.com/aiservice/internal/providers"
+	"github.com/aiservice/internal/services/graph"
 	"github.com/aiservice/internal/services/image"
 	"github.com/aiservice/internal/utils"
 	"github.com/firebase/genkit/go/ai"
@@ -22,6 +22,12 @@ var preprocessor = preprocessing.NewPreprocessor()
 
 // DigitalInkClient for recognizing handwriting
 var digitalInkClient = digitalink.NewClient("en", 0)
+
+// InkCache для кэширования результатов распознавания
+var inkCache = NewInkCache()
+
+// GraphPreprocessor для преобразования графов
+var graphPreprocessor = graph.NewGraphPreprocessor()
 
 // ImageService for downloading and cleaning up images
 var imageService *image.Service
@@ -101,7 +107,19 @@ func newDigitalInkAnalysisStep() Step {
 			return nil
 		}
 
-		// Recognize handwriting
+		// Generate cache key from line elements
+		cacheKey := GenerateInkCacheKey(lineElements)
+		slog.Debug("ink cache key", "key", cacheKey)
+
+		// Try to get from cache first
+		if recognizedText, found := inkCache.Get(cacheKey); found {
+			slog.Info("Digital ink cache HIT", "key", cacheKey[:16]+"...")
+			state.DigitalInkText = recognizedText
+			return nil
+		}
+
+		// Cache miss - recognize handwriting
+		slog.Info("Digital ink cache MISS", "key", cacheKey[:16]+"...")
 		recognizedText, err := digitalInkClient.RecognizeInk(ctx, lineElements)
 		if err != nil {
 			slog.Warn("digital ink recognition failed", "err", err)
@@ -109,12 +127,68 @@ func newDigitalInkAnalysisStep() Step {
 			return nil
 		}
 
-		// Store recognized text in state for later use
-		if recognizedText != "" {
-			state.DigitalInkText = recognizedText
-			slog.Debug("digital ink recognized", "text_length", len(recognizedText))
+		// Cache the result
+		inkCache.Set(cacheKey, recognizedText)
+		slog.Debug("ink recognition cached", "key", cacheKey[:16]+"...", "text_len", len(recognizedText))
+
+		state.DigitalInkText = recognizedText
+		return nil
+	}
+}
+
+// newGraphPreprocessingStep преобразует граф в семантический формат
+func newGraphPreprocessingStep() Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		// Проверяем, есть ли граф в запросе
+		var graphNodes []models.GNode
+		var graphEdges []models.GEdge
+
+		if state.AnalyzeRequest.RequestType == models.SummarizeType {
+			graphNodes = state.AnalyzeRequest.SummarizeRequest.Board.GraphNodes
+			graphEdges = state.AnalyzeRequest.SummarizeRequest.Board.GraphEdges
+		} else if state.AnalyzeRequest.RequestType == models.StructurizeType {
+			graphNodes = state.AnalyzeRequest.StructurizeRequest.Board.GraphNodes
+			graphEdges = state.AnalyzeRequest.StructurizeRequest.Board.GraphEdges
 		}
 
+		// Если графа нет - пропускаем шаг
+		if len(graphNodes) == 0 {
+			slog.Debug("no graph nodes found, skipping graph preprocessing")
+			return nil
+		}
+
+		// Преобразуем граф в семантический формат
+		semanticGraph, err := graphPreprocessor.Process(graphNodes, graphEdges)
+		if err != nil {
+			slog.Warn("graph preprocessing failed", "err", err)
+			return nil // не прерываем пайплайн
+		}
+
+		// Сохраняем в state для использования в Summarize/Structurize шаге
+		state.SemanticGraph = semanticGraph
+		slog.Info("graph preprocessed", "nodes", len(semanticGraph.Nodes), "edges", len(semanticGraph.Edges))
+
+		return nil
+	}
+}
+
+// newTemplateGenerationStep generates a board template from a prompt
+func newTemplateGenerationStep(llm providers.LLMClient) Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		// Prepare data for LLM
+		parts := preprocessing.PreprocessGenerateTemplateRequest(
+			state.AnalyzeRequest.TemplateRequest.Prompt,
+			state.AnalyzeRequest.TemplateRequest.BoardType,
+		)
+
+		// Call LLM
+		resp, err := llm.GenerateTemplate(ctx, parts)
+		if err != nil {
+			return err
+		}
+
+		// Store result in state
+		state.TemplateGenerationFlow = resp
 		return nil
 	}
 }
@@ -153,22 +227,15 @@ func newImageRecognitionStep(llm providers.LLMClient) Step {
 
 func newSummarizeStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		var combinedText strings.Builder
-
-		if state.ImageRecognitionFlow.ImageDescription != "" {
-			combinedText.WriteString("IMAGE DESCRIPTION:\n")
-			combinedText.WriteString(state.ImageRecognitionFlow.ImageDescription)
-			combinedText.WriteString("\n\n")
-		}
-
-		if state.DigitalInkText != "" {
-			combinedText.WriteString("DIGITAL INK DATA:\n")
-			combinedText.WriteString(state.DigitalInkText)
-		}
+		// Prepare dynamic data for user message using preprocessor
+		userData := preprocessing.PreprocessSummarizeData(
+			state.ImageRecognitionFlow.ImageDescription,
+			state.DigitalInkText,
+			state.SemanticGraph,
+		)
 
 		parts := []*ai.Part{
-			ai.NewTextPart(preprocessing.SummarizePrompt),
-			ai.NewTextPart("\n\nTEXT FROM BOARD:\n" + combinedText.String()),
+			ai.NewTextPart(userData),
 		}
 
 		resp, err := llm.Summarize(ctx, parts)
@@ -228,12 +295,15 @@ func createTextElementFromSummarization(summarization string, state *PipelineSta
 
 func newStructurizeStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		parts, err := preprocessor.PreprocessStructurizeRequest(
+		// Prepare dynamic data for user message using preprocessor
+		userData := preprocessing.PreprocessStructurizeData(
 			state.ImageRecognitionFlow.ImageDescription,
 			state.DigitalInkText,
+			state.SemanticGraph,
 		)
-		if err != nil {
-			return err
+
+		parts := []*ai.Part{
+			ai.NewTextPart(userData),
 		}
 
 		resp, err := llm.Structurize(ctx, parts)
@@ -242,6 +312,91 @@ func newStructurizeStep(llm providers.LLMClient) Step {
 		}
 
 		state.StructurizeFlow = resp
+		return nil
+	}
+}
+
+func newConvertTemplateToBoardStep() Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		// Convert TemplateGenerationFlow to models.Board
+		board := convertTemplateToBoard(state.TemplateGenerationFlow, state.AnalyzeRequest.TemplateRequest.BoardID)
+		state.GeneratedBoard = board
+		return nil
+	}
+}
+
+func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID string) *models.Board {
+	board := &models.Board{
+		BoardID:    boardID,
+		ImageURL:   "",
+		Elements:   make([]models.Element, 0),
+		GraphNodes: make([]models.GNode, 0),
+		GraphEdges: make([]models.GEdge, 0),
+	}
+
+	if template.BoardType == "simple" {
+		// Convert template elements to board elements
+		for _, elem := range template.Elements {
+			board.Elements = append(board.Elements, models.Element{
+				Id:           fmt.Sprintf("elem-%s", elem.Type),
+				Type:         elem.Type,
+				X:            elem.X,
+				Y:            elem.Y,
+				Width:        elem.Width,
+				Height:       elem.Height,
+				Rotation:     elem.Rotation,
+				Fill:         elem.Fill,
+				Stroke:       elem.Stroke,
+				StrokeWidth:  elem.StrokeWidth,
+				Content:      elem.Content,
+				CornerRadius: elem.CornerRadius,
+			})
+		}
+	} else if template.BoardType == "graph" {
+		// Convert template nodes to graph nodes
+		for _, node := range template.GraphNodes {
+			board.GraphNodes = append(board.GraphNodes, models.GNode{
+				ID:   node.ID,
+				Type: node.Type,
+				Position: models.GPosition{
+					X: node.PositionX,
+					Y: node.PositionY,
+				},
+				Data: models.GNodeData{
+					Title:       node.Title,
+					Description: node.Description,
+					Shape:       node.Shape,
+					Color:       node.Color,
+					URL:         node.URL,
+				},
+			})
+		}
+
+		// Convert template edges to graph edges
+		for _, edge := range template.GraphEdges {
+			board.GraphEdges = append(board.GraphEdges, models.GEdge{
+				ID:     edge.ID,
+				Type:   edge.Type,
+				Source: edge.Source,
+				Target: edge.Target,
+				Label:  edge.Label,
+			})
+		}
+	}
+
+	return board
+}
+
+func newFillTemplateResponseStep() Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		if state.GeneratedBoard != nil {
+			state.AnalyzeResponse.TemplateResponse = models.GenerateTemplateResponse{
+				RequestID:   state.AnalyzeRequest.TemplateRequest.RequestID,
+				UserID:      state.AnalyzeRequest.TemplateRequest.UserID,
+				RequestType: state.AnalyzeRequest.TemplateRequest.RequestType,
+				Board:       *state.GeneratedBoard,
+			}
+		}
 		return nil
 	}
 }

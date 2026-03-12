@@ -1,8 +1,11 @@
 package models
 
+import "fmt"
+
 const (
-	SummarizeType   = "summarize"
-	StructurizeType = "structurize"
+	SummarizeType        = "summarize"
+	StructurizeType      = "structurize"
+	GenerateTemplateType = "generateTemplate"
 )
 
 const (
@@ -10,6 +13,14 @@ const (
 	TextType     = "text"
 	EllipseType  = "ellipse"
 	LineTypeType = "line"
+)
+
+// BoardType represents the type of board
+type BoardType string
+
+const (
+	BoardTypeSimple BoardType = "simple"
+	BoardTypeGraph  BoardType = "graph"
 )
 
 // type Rectangle struct {
@@ -76,15 +87,19 @@ type Element struct {
 }
 
 type Board struct {
-	BoardID  string    `json:"boardId"`
-	ImageURL string    `json:"imageUrl,omitempty"`
-	Elements []Element `json:"elements"`
+	BoardID       string          `json:"boardId"`
+	ImageURL      string          `json:"imageUrl,omitempty"`
+	Elements      []Element       `json:"elements,omitempty"`
+	GraphNodes    []GNode         `json:"graphNodes,omitempty"`
+	GraphEdges    []GEdge         `json:"graphEdges,omitempty"`
+	SemanticGraph *SemanticGraph  `json:"-"`
 }
 
 type AnalyzeRequest struct {
-	RequestType        string `json:"requestType"` // summarize, structurize
+	RequestType        string                 `json:"requestType"`
 	SummarizeRequest   SummarizeRequest
 	StructurizeRequest StructurizeRequest
+	TemplateRequest    GenerateTemplateRequest
 }
 
 func NewSumAnalyzeReq(req SummarizeRequest) AnalyzeRequest {
@@ -95,9 +110,14 @@ func NewStructAnalyzeReq(req StructurizeRequest) AnalyzeRequest {
 	return AnalyzeRequest{RequestType: StructurizeType, StructurizeRequest: req}
 }
 
+func NewTemplateAnalyzeReq(req GenerateTemplateRequest) AnalyzeRequest {
+	return AnalyzeRequest{RequestType: GenerateTemplateType, TemplateRequest: req}
+}
+
 type AnalyzeResponse struct {
 	SummarizeResponse   SummarizeResponse
 	StructurizeResponse StructurizeResponse
+	TemplateResponse    GenerateTemplateResponse
 }
 
 type SummarizeRequest struct {
@@ -169,4 +189,67 @@ type TranscriptionResult struct {
 	Text     string
 	Language string
 	Metadata map[string]any
+}
+
+// GenerateTemplateRequest represents a request to generate a board template
+type GenerateTemplateRequest struct {
+	RequestID   string    `json:"requestId"`
+	UserID      string    `json:"userId"`
+	RequestType string    `json:"requestType"`
+	BoardID     string    `json:"boardId"`
+	Prompt      string    `json:"prompt"`
+	BoardType   BoardType `json:"boardType"`
+}
+
+// Validate validates the generate template request
+func (r *GenerateTemplateRequest) Validate() error {
+	if r.RequestID == "" {
+		return fmt.Errorf("requestId is required")
+	}
+
+	if r.UserID == "" {
+		return fmt.Errorf("userId is required")
+	}
+
+	if r.RequestType == "" {
+		return fmt.Errorf("requestType is required")
+	}
+
+	if r.RequestType != GenerateTemplateType {
+		return fmt.Errorf("requestType must be 'generateTemplate'")
+	}
+
+	if r.BoardID == "" {
+		return fmt.Errorf("boardId is required")
+	}
+
+	if r.Prompt == "" {
+		return fmt.Errorf("prompt is required")
+	}
+
+	if len(r.Prompt) < 10 {
+		return fmt.Errorf("prompt must be at least 10 characters")
+	}
+
+	if len(r.Prompt) > 2000 {
+		return fmt.Errorf("prompt must be at most 2000 characters")
+	}
+
+	if r.BoardType == "" {
+		return fmt.Errorf("boardType is required")
+	}
+
+	if r.BoardType != BoardTypeSimple && r.BoardType != BoardTypeGraph {
+		return fmt.Errorf("boardType must be 'simple' or 'graph'")
+	}
+
+	return nil
+}
+
+// GenerateTemplateResponse represents the response from template generation
+type GenerateTemplateResponse struct {
+	RequestID   string `json:"requestId"`
+	UserID      string `json:"userId"`
+	RequestType string `json:"requestType"`
+	Board       Board  `json:"board"`
 }

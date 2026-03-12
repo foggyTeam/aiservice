@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/aiservice/internal/config"
+	"github.com/aiservice/internal/preprocessing"
 	"github.com/aiservice/internal/providers"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -69,9 +70,17 @@ func NewOllamaClient(ctx context.Context, cfg config.LLMProviderConfig) *OllamaC
 }
 
 func (o *OllamaClient) Summarize(ctx context.Context, parts []*ai.Part) (providers.SummarizeFlow, error) {
+	// System message - fixed instructions
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.SummarizeSystemPrompt),
+	)
+
+	// User message - dynamic data
+	userMsg := ai.NewUserMessage(parts...)
+
 	resp, err := genkit.Generate(ctx, o.gkit,
 		ai.WithModel(o.textModel),
-		ai.WithMessages(ai.NewUserMessage(parts...)),
+		ai.WithMessages(systemMsg, userMsg),
 		ai.WithOutputType(&providers.SummarizeFlow{}),
 	)
 	if err != nil {
@@ -88,9 +97,17 @@ func (o *OllamaClient) Summarize(ctx context.Context, parts []*ai.Part) (provide
 }
 
 func (o *OllamaClient) Structurize(ctx context.Context, parts []*ai.Part) (providers.StructurizeFlow, error) {
+	// System message - fixed instructions
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.StructurizeSystemPrompt),
+	)
+
+	// User message - dynamic data
+	userMsg := ai.NewUserMessage(parts...)
+
 	resp, err := genkit.Generate(ctx, o.gkit,
 		ai.WithModel(o.textModel),
-		ai.WithMessages(ai.NewUserMessage(parts...)),
+		ai.WithMessages(systemMsg, userMsg),
 		ai.WithOutputType(&providers.StructurizeFlow{}),
 	)
 	if err != nil {
@@ -109,6 +126,34 @@ func (o *OllamaClient) Structurize(ctx context.Context, parts []*ai.Part) (provi
 
 func (o *OllamaClient) GetName() string {
 	return "ollama"
+}
+
+func (o *OllamaClient) GenerateTemplate(ctx context.Context, parts []*ai.Part) (providers.TemplateGenerationFlow, error) {
+	// System message - fixed instructions
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.GenerateTemplatePrompt),
+	)
+
+	// User message - dynamic data
+	userMsg := ai.NewUserMessage(parts...)
+
+	resp, err := genkit.Generate(ctx, o.gkit,
+		ai.WithModel(o.textModel),
+		ai.WithMessages(systemMsg, userMsg),
+		ai.WithOutputType(&providers.TemplateGenerationFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate template:", "err", err)
+		return providers.TemplateGenerationFlow{}, err
+	}
+
+	var templateFlow providers.TemplateGenerationFlow
+	if err := resp.Output(&templateFlow); err != nil {
+		slog.Error("could not parse template output:", "err", err)
+		return providers.TemplateGenerationFlow{}, err
+	}
+
+	return templateFlow, nil
 }
 
 func (o *OllamaClient) ImageRecognition(ctx context.Context, parts []*ai.Part) (providers.ImageRecognitionFlow, error) {

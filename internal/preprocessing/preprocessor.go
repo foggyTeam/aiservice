@@ -1,12 +1,36 @@
 package preprocessing
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/aiservice/internal/models"
 	"github.com/firebase/genkit/go/ai"
 )
+
+const GenerateTemplatePrompt = `
+Ты ассистент для генерации шаблонов досок на основе текстового описания.
+
+Тебе предоставлен промпт от пользователя с описанием того, какую доску он хочет создать.
+
+Твоя задача:
+1) Проанализируй промпт пользователя
+2) Определи тип доски (simple или graph) на основе контекста
+3) Сгенерируй структуру доски с элементами/узлами
+
+Типы досок:
+- simple: простая доска с элементами (rectangle, text, ellipse, line). Подходит для brainstorming, заметок, идей.
+- graph: граф с узлами и рёбрами (React Flow). Подходит для архитектуры, зависимостей, workflow.
+
+Требования:
+- Для simple board: заполни elements, оставь graphNodes и graphEdges пустыми
+- Для graph board: заполни graphNodes и graphEdges, оставь elements пустым
+- Позиции элементов должны быть разумными (не выходить за пределы 2000x2000)
+- Цвета в формате hex (#RRGGBB)
+- Content может содержать HTML теги: <p>, <br>, <strong>, <em>, <ul>, <ol>, <li>
+- Title и description должны кратко описывать сгенерированную доску
+`
 
 const ImageRecognitionPrompt = `
 Что ты видишь на доске?
@@ -18,10 +42,22 @@ const ImageRecognitionPrompt = `
 }
 `
 
-const SummarizePrompt = `
+// SummarizeSystemPrompt contains fixed instructions for summarization
+const SummarizeSystemPrompt = `
 Тебе предоставлено описание содержимого доски:
 1. IMAGE DESCRIPTION - описание того, что видно на изображении доски
 2. DIGITAL INK DATA - распознанный текст из рукописных заметок
+3. GRAPH STRUCTURE - семантическое представление графа (узлы и связи между ними)
+
+GRAPH STRUCTURE формат:
+{
+  "nodes": [
+    {"id": "...", "label": "...", "kind": "component|service|database|external_link|internal_link|navigation", "description": "...", "url": "..."}
+  ],
+  "edges": [
+    {"from": "...", "to": "...", "label": "..."}
+  ]
+}
 
 Твоя задача:
 1) Проанализируй всё предоставленное описание
@@ -38,10 +74,22 @@ const SummarizePrompt = `
 - Отражай ключевые выводы и решения пользователей
 `
 
-const StructurizePrompt = `
+// StructurizeSystemPrompt contains fixed instructions for structurization
+const StructurizeSystemPrompt = `
 Тебе предоставлено описание содержимого доски:
 1. IMAGE DESCRIPTION - описание того, что видно на изображении доски (текст, графы, схемы, рисунки)
 2. DIGITAL INK DATA - текст из рукописных заметок
+3. GRAPH STRUCTURE - семантическое представление графа (узлы и связи между ними)
+
+GRAPH STRUCTURE формат:
+{
+  "nodes": [
+    {"id": "...", "label": "...", "kind": "component|service|database|external_link|internal_link|navigation", "description": "...", "url": "..."}
+  ],
+  "edges": [
+    {"from": "...", "to": "...", "label": "..."}
+  ]
+}
 
 Твоя задача:
 1) Проанализируй всё предоставленное описание
@@ -75,47 +123,79 @@ func NewPreprocessor() *Preprocessor {
 	return &Preprocessor{}
 }
 
-// PreprocessSummarizeRequest transforms a raw summarize request into a structured format
-func (p *Preprocessor) PreprocessSummarizeRequest(req models.SummarizeRequest, recognizedText string, imageURI string) ([]*ai.Part, error) {
-	parts := []*ai.Part{
-		ai.NewTextPart(SummarizePrompt),
-	}
+// PreprocessGenerateTemplateRequest prepares data for template generation
+func PreprocessGenerateTemplateRequest(prompt string, boardType models.BoardType) []*ai.Part {
+	var userData strings.Builder
 
-	// Add recognized ink text if available
-	if recognizedText != "" {
-		inkText := fmt.Sprintf("\n\nDIGITAL INK RECOGNIZED TEXT:\n%s", recognizedText)
-		parts = append(parts, ai.NewTextPart(inkText))
-	}
+	userData.WriteString("USER PROMPT:\n")
+	userData.WriteString(prompt)
+	userData.WriteString("\n\n")
 
-	// Add image if URI is provided
+	userData.WriteString("REQUESTED BOARD TYPE: ")
+	userData.WriteString(string(boardType))
+	userData.WriteString("\n\n")
 
-	parts = []*ai.Part{
-		ai.NewTextPart("Что ты видишь на доске?"),
-	}
-	if imageURI != "" {
-		parts = append(parts, ai.NewMediaPart("image/jpeg", imageURI))
-	}
+	userData.WriteString("Generate a board template based on the user's prompt.")
 
-	return parts, nil
+	return []*ai.Part{
+		ai.NewTextPart(userData.String()),
+	}
 }
 
-// PreprocessStructurizeRequest transforms a raw structurize request into a structured format
-func (p *Preprocessor) PreprocessStructurizeRequest(imageDescription string, inkData string) ([]*ai.Part, error) {
-	parts := []*ai.Part{
-		ai.NewTextPart(StructurizePrompt),
+// PreprocessSummarizeData prepares dynamic data for user message (data only, no instructions)
+func PreprocessSummarizeData(imageDescription string, recognizedText string, semanticGraph *models.SemanticGraph) string {
+	var userData strings.Builder
+
+	// Добавляем семантический граф если есть
+	if semanticGraph != nil {
+		graphJSON, _ := json.MarshalIndent(semanticGraph, "", "  ")
+		userData.WriteString("GRAPH STRUCTURE:\n")
+		userData.WriteString(string(graphJSON))
+		userData.WriteString("\n\n")
 	}
 
-	// Add image description if available
+	// Добавляем image description если есть
 	if imageDescription != "" {
-		parts = append(parts, ai.NewTextPart("\n\nIMAGE DESCRIPTION:\n"+imageDescription))
+		userData.WriteString("IMAGE DESCRIPTION:\n")
+		userData.WriteString(imageDescription)
+		userData.WriteString("\n\n")
 	}
 
-	// Add ink data if available
+	// Добавляем digital ink data если есть
+	if recognizedText != "" {
+		userData.WriteString("DIGITAL INK DATA:\n")
+		userData.WriteString(recognizedText)
+	}
+
+	return userData.String()
+}
+
+// PreprocessStructurizeData prepares dynamic data for user message (data only, no instructions)
+func PreprocessStructurizeData(imageDescription string, inkData string, semanticGraph *models.SemanticGraph) string {
+	var userData strings.Builder
+
+	// Добавляем семантический граф если есть
+	if semanticGraph != nil {
+		graphJSON, _ := json.MarshalIndent(semanticGraph, "", "  ")
+		userData.WriteString("GRAPH STRUCTURE:\n")
+		userData.WriteString(string(graphJSON))
+		userData.WriteString("\n\n")
+	}
+
+	// Добавляем image description если есть
+	if imageDescription != "" {
+		userData.WriteString("IMAGE DESCRIPTION:\n")
+		userData.WriteString(imageDescription)
+		userData.WriteString("\n\n")
+	}
+
+	// Добавляем digital ink data если есть
 	if inkData != "" {
-		parts = append(parts, ai.NewTextPart("\n\nDIGITAL INK DATA:\n"+inkData))
+		userData.WriteString("DIGITAL INK DATA:\n")
+		userData.WriteString(inkData)
 	}
 
-	return parts, nil
+	return userData.String()
 }
 
 // createFileHierarchyDescription generates a description of the requested file hierarchy

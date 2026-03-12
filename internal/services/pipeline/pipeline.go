@@ -11,15 +11,18 @@ import (
 )
 
 type PipelineState struct {
-	AnalyzeRequest       models.AnalyzeRequest
-	AnalyzeResponse      models.AnalyzeResponse
-	DigitalInkText       string
-	ImageURI             string
-	ImageDownloadResult  *image.DownloadResult
-	Provider             string
-	ImageRecognitionFlow providers.ImageRecognitionFlow
-	SummarizeFlow        providers.SummarizeFlow
-	StructurizeFlow      providers.StructurizeFlow
+	AnalyzeRequest         models.AnalyzeRequest
+	AnalyzeResponse        models.AnalyzeResponse
+	DigitalInkText         string
+	ImageURI               string
+	ImageDownloadResult    *image.DownloadResult
+	Provider               string
+	ImageRecognitionFlow   providers.ImageRecognitionFlow
+	SummarizeFlow          providers.SummarizeFlow
+	StructurizeFlow        providers.StructurizeFlow
+	SemanticGraph          *models.SemanticGraph
+	TemplateGenerationFlow providers.TemplateGenerationFlow
+	GeneratedBoard         *models.Board
 }
 
 type Step func(ctx context.Context, state *PipelineState) error
@@ -47,6 +50,7 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 		return NewPipeline(
 			newImageDownloadStep(),
 			newDigitalInkAnalysisStep(),
+			newGraphPreprocessingStep(),
 			newImageRecognitionStep(llm),
 			newSummarizeStep(llm),
 			newFillSummarizeResponseStep(),
@@ -56,10 +60,17 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 		return NewPipeline(
 			newImageDownloadStep(),
 			newDigitalInkAnalysisStep(),
+			newGraphPreprocessingStep(),
 			newImageRecognitionStep(llm),
 			newStructurizeStep(llm),
 			newFillStructurizeResponseStep(),
 			newImageCleanupStep(),
+		), nil
+	case models.GenerateTemplateType:
+		return NewPipeline(
+			newTemplateGenerationStep(llm),
+			newConvertTemplateToBoardStep(),
+			newFillTemplateResponseStep(),
 		), nil
 	default:
 		return nil, fmt.Errorf("unsupported input type: %s", t)
