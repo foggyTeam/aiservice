@@ -155,11 +155,14 @@ func main() {
 		cfg.Timeouts.SyncProcess,
 	)
 
+	TemplateHandler := handlers.NewTemplateHandler(analysisService)
+
 	e.GET("/health", handlers.HealthHandler)
 	e.GET("/jobs/:id", AnalyzeHandler.GetJobStatus)
 	e.PUT("/jobs/:id/abort", AnalyzeHandler.Abort)
 	e.POST("/summarize", AnalyzeHandler.Summarize)
 	e.POST("/structurize", AnalyzeHandler.Structurize)
+	e.POST("/template", TemplateHandler.TemplateRequest)
 
 	startServer(ctx, cancel, cfg, jobQueueService, e)
 }

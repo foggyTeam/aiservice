@@ -87,16 +87,16 @@ type Element struct {
 }
 
 type Board struct {
-	BoardID       string          `json:"boardId"`
-	ImageURL      string          `json:"imageUrl,omitempty"`
-	Elements      []Element       `json:"elements,omitempty"`
-	GraphNodes    []GNode         `json:"graphNodes,omitempty"`
-	GraphEdges    []GEdge         `json:"graphEdges,omitempty"`
-	SemanticGraph *SemanticGraph  `json:"-"`
+	BoardID       string         `json:"boardId"`
+	ImageURL      string         `json:"imageUrl,omitempty"`
+	Elements      []Element      `json:"elements,omitempty"`
+	GraphNodes    []GNode        `json:"graphNodes,omitempty"`
+	GraphEdges    []GEdge        `json:"graphEdges,omitempty"`
+	SemanticGraph *SemanticGraph `json:"-"`
 }
 
 type AnalyzeRequest struct {
-	RequestType        string                 `json:"requestType"`
+	RequestType        string `json:"requestType"`
 	SummarizeRequest   SummarizeRequest
 	StructurizeRequest StructurizeRequest
 	TemplateRequest    GenerateTemplateRequest
@@ -209,10 +209,6 @@ func (r *GenerateTemplateRequest) Validate() error {
 
 	if r.UserID == "" {
 		return fmt.Errorf("userId is required")
-	}
-
-	if r.RequestType == "" {
-		return fmt.Errorf("requestType is required")
 	}
 
 	if r.RequestType != GenerateTemplateType {
