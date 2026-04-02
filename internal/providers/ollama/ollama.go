@@ -30,6 +30,29 @@ func NewOllamaClient(ctx context.Context, cfg config.LLMProviderConfig) *OllamaC
 		genkit.WithDefaultModel("ollama/"+cfg.TextModel),
 	)
 
+	if cfg.TextModel == cfg.VisionModel {
+		slog.Info("Using same model for text and vision tasks", "model", cfg.TextModel)
+		model := ollamaPlugin.DefineModel(
+			gkit,
+			ollama.ModelDefinition{
+				Name: cfg.VisionModel,
+				Type: "chat",
+			},
+			&ai.ModelOptions{
+				Supports: &ai.ModelSupports{
+					Multiturn:  true,
+					SystemRole: true,
+					Media:      true,
+				},
+			},
+		)
+		return &OllamaClient{
+			cfg:         cfg,
+			gkit:        gkit,
+			textModel:   model,
+			visionModel: model,
+		}
+	}
 	// Инициализируем текстовую модель (для суммаризации)
 	textModel := ollamaPlugin.DefineModel(
 		gkit,
@@ -141,6 +164,7 @@ func (o *OllamaClient) GenerateTemplate(ctx context.Context, parts []*ai.Part) (
 		ai.WithModel(o.textModel),
 		ai.WithMessages(systemMsg, userMsg),
 		ai.WithOutputType(&providers.TemplateGenerationFlow{}),
+		// ai.WithConfig(ai.WithOutputFormat("json")),
 	)
 	if err != nil {
 		slog.Error("could not generate template:", "err", err)

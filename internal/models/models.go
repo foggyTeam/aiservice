@@ -30,7 +30,7 @@ const (
 
 type Text struct {
 	BaseElement
-	Content string `json:"content"`
+	Content string `json:"content" jsonschema:"description=Текстовое содержимое элемента"`
 }
 
 // type Ellipse struct {
@@ -52,46 +52,46 @@ type Text struct {
 // }
 
 type BaseElement struct {
-	Id          string  `json:"id"`
-	Type        string  `json:"type"` //rect, line, text, ellipse,
-	X           float32 `json:"x"`
-	Y           float32 `json:"y"`
-	Width       float32 `json:"width"`
-	Height      float32 `json:"height"`
-	Rotation    float32 `json:"rotation"`
-	Fill        string  `json:"fill,omitempty"`        // цвет заливки
-	Stroke      string  `json:"stroke,omitempty"`      // цвет обводки
-	StrokeWidth int     `json:"strokeWidth,omitempty"` // толщина обводки
+	Id          string  `json:"id" jsonschema:"description=Уникальный идентификатор элемента"`
+	Type        string  `json:"type" jsonschema:"description=Тип элемента: rectangle, text, ellipse, line"`
+	X           float32 `json:"x" jsonschema:"description=Координата X левого верхнего угла"`
+	Y           float32 `json:"y" jsonschema:"description=Координата Y левого верхнего угла"`
+	Width       float32 `json:"width" jsonschema:"description=Ширина элемента"`
+	Height      float32 `json:"height" jsonschema:"description=Высота элемента"`
+	Rotation    float32 `json:"rotation" jsonschema:"description=Угол поворота в градусах"`
+	Fill        string  `json:"fill,omitempty" jsonschema:"description=Цвет заливки в формате hex"`
+	Stroke      string  `json:"stroke,omitempty" jsonschema:"description=Цвет обводки в формате hex"`
+	StrokeWidth int     `json:"strokeWidth,omitempty" jsonschema:"description=Толщина обводки в пикселях"`
 }
 
 type Element struct {
-	Id          string  `json:"id"`
-	Type        string  `json:"type"` //rect, line, text, ellipse,
-	X           float32 `json:"x"`
-	Y           float32 `json:"y"`
-	Width       float32 `json:"width"`
-	Height      float32 `json:"height"`
-	Rotation    float32 `json:"rotation"`
-	Fill        string  `json:"fill,omitempty"`        // цвет заливки
-	Stroke      string  `json:"stroke,omitempty"`      // цвет обводки
-	StrokeWidth int     `json:"strokeWidth,omitempty"` // толщина обводки
+	Id          string  `json:"id" jsonschema:"description=Уникальный идентификатор элемента"`
+	Type        string  `json:"type" jsonschema:"description=Тип элемента: rectangle, text, ellipse, line"`
+	X           float32 `json:"x" jsonschema:"description=Координата X левого верхнего угла"`
+	Y           float32 `json:"y" jsonschema:"description=Координата Y левого верхнего угла"`
+	Width       float32 `json:"width" jsonschema:"description=Ширина элемента"`
+	Height      float32 `json:"height" jsonschema:"description=Высота элемента"`
+	Rotation    float32 `json:"rotation" jsonschema:"description=Угол поворота в градусах"`
+	Fill        string  `json:"fill,omitempty" jsonschema:"description=Цвет заливки в формате hex"`
+	Stroke      string  `json:"stroke,omitempty" jsonschema:"description=Цвет обводки в формате hex"`
+	StrokeWidth int     `json:"strokeWidth,omitempty" jsonschema:"description=Толщина обводки в пикселях"`
 
 	// inserted from rectangle model
-	CornerRadius int `json:"cornerRadius,omitempty"`
+	CornerRadius int `json:"cornerRadius,omitempty" jsonschema:"description=Радиус скругления углов для прямоугольника"`
 
 	// inserted from text model
-	Content string `json:"content,omitempty"`
+	Content string `json:"content,omitempty" jsonschema:"description=Текстовое содержимое элемента"`
 
-	Points  []float32 `json:"points,omitempty"`  // [x, y], [x, y]
-	Tension float32   `json:"tension,omitempty"` // давление
+	Points  []float32 `json:"points,omitempty" jsonschema:"description=Массив точек для линий в формате [x1,y1,x2,y2,...]"`
+	Tension float32   `json:"tension,omitempty" jsonschema:"description=Давление/натяжение для кривых линий"`
 }
 
 type Board struct {
-	BoardID       string         `json:"boardId"`
-	ImageURL      string         `json:"imageUrl,omitempty"`
-	Elements      []Element      `json:"elements,omitempty"`
-	GraphNodes    []GNode        `json:"graphNodes,omitempty"`
-	GraphEdges    []GEdge        `json:"graphEdges,omitempty"`
+	BoardID       string         `json:"boardId" jsonschema:"description=Уникальный идентификатор доски"`
+	ImageURL      string         `json:"imageUrl,omitempty" jsonschema:"description=URL изображения доски"`
+	Elements      []Element      `json:"elements,omitempty" jsonschema:"description=Элементы доски (прямоугольники, текст, линии)"`
+	GraphNodes    []GNode        `json:"graphNodes,omitempty" jsonschema:"description=Узлы графа для React Flow досок"`
+	GraphEdges    []GEdge        `json:"graphEdges,omitempty" jsonschema:"description=Рёбра графа для React Flow досок"`
 	SemanticGraph *SemanticGraph `json:"-"`
 }
 
@@ -121,36 +121,39 @@ type AnalyzeResponse struct {
 }
 
 type SummarizeRequest struct {
-	RequestID   string `json:"requestId,omitempty"`
-	UserID      string `json:"userId,omitempty"`
-	RequestType string `json:"requestType"` // summarize
-	Board       Board  `json:"board"`
+	RequestID   string `json:"requestId,omitempty" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID      string `json:"userId,omitempty" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType string `json:"requestType" jsonschema:"description=Тип запроса: summarize"`
+	Board       Board  `json:"board" jsonschema:"description=Данные доски для анализа"`
 }
+
 type SummarizeResponse struct {
-	RequestID   string `json:"requestId"`
-	UserID      string `json:"userId"`
-	RequestType string `json:"requestType"` // summarize
-	Element     Text   `json:"text"`        // конкретный элемент - текст, который суммаризовал инфу по доске, расположенный в свободном пространстве доски
+	RequestID   string `json:"requestId" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID      string `json:"userId" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType string `json:"requestType" jsonschema:"description=Тип запроса: summarize"`
+	Element     Text   `json:"text" jsonschema:"description=Сгенерированный текст суммаризации"`
 }
+
 type StructurizeRequest struct {
-	RequestID   string `json:"requestId"`
-	UserID      string `json:"userId"`
-	RequestType string `json:"requestType"` // structurize
-	Board       Board  `json:"board"`
-	File        File   `json:"file"`
+	RequestID   string `json:"requestId" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID      string `json:"userId" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType string `json:"requestType" jsonschema:"description=Тип запроса: structurize"`
+	Board       Board  `json:"board" jsonschema:"description=Данные доски для анализа"`
+	File        File   `json:"file" jsonschema:"description=Исходная файловая структура"`
 }
+
 type StructurizeResponse struct {
-	RequestID      string `json:"requestId"`
-	UserID         string `json:"userId"`
-	RequestType    string `json:"requestType"`    // structurize
-	AiTreeResponse string `json:"aiTreeResponse"` // дерево ASCII файлов
-	File           File   `json:"file"`
+	RequestID      string `json:"requestId" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID         string `json:"userId" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType    string `json:"requestType" jsonschema:"description=Тип запроса: structurize"`
+	AiTreeResponse string `json:"aiTreeResponse" jsonschema:"description=ASCII представление файловой структуры"`
+	File           File   `json:"file" jsonschema:"description=Сгенерированная файловая структура"`
 }
 
 type File struct {
-	Name     string `json:"name" example:"main.go"`
-	Type     string `json:"type" example:"doc"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
-	Children []File `json:"children"`
+	Name     string `json:"name" jsonschema:"description=Имя файла или папки"`
+	Type     string `json:"type" jsonschema:"description=Тип: doc (файл), section (папка)"`
+	Children []File `json:"children" jsonschema:"description=Дочерние элементы (для папок)"`
 }
 
 func (f File) IsEmpty() bool {
@@ -193,12 +196,12 @@ type TranscriptionResult struct {
 
 // GenerateTemplateRequest represents a request to generate a board template
 type GenerateTemplateRequest struct {
-	RequestID   string    `json:"requestId"`
-	UserID      string    `json:"userId"`
-	RequestType string    `json:"requestType"`
-	BoardID     string    `json:"boardId"`
-	Prompt      string    `json:"prompt"`
-	BoardType   BoardType `json:"boardType"`
+	RequestID   string    `json:"requestId" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID      string    `json:"userId" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType string    `json:"requestType" jsonschema:"description=Тип запроса: generateTemplate"`
+	BoardID     string    `json:"boardId" jsonschema:"description=Уникальный идентификатор доски"`
+	Prompt      string    `json:"prompt" jsonschema:"description=Текстовый промпт для генерации шаблона"`
+	BoardType   BoardType `json:"boardType" jsonschema:"description=Тип доски: simple или graph"`
 }
 
 // Validate validates the generate template request
@@ -244,8 +247,8 @@ func (r *GenerateTemplateRequest) Validate() error {
 
 // GenerateTemplateResponse represents the response from template generation
 type GenerateTemplateResponse struct {
-	RequestID   string `json:"requestId"`
-	UserID      string `json:"userId"`
-	RequestType string `json:"requestType"`
-	Board       Board  `json:"board"`
+	RequestID   string `json:"requestId" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID      string `json:"userId" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType string `json:"requestType" jsonschema:"description=Тип запроса: generateTemplate"`
+	Board       Board  `json:"board" jsonschema:"description=Сгенерированная доска с элементами"`
 }

@@ -53,9 +53,6 @@ func (p *GraphPreprocessor) convertNode(node models.GNode) models.SemanticNode {
 		semanticNode.Kind = "external_link"
 		semanticNode.URL = node.Data.URL
 		semanticNode.Description = node.Data.Description
-		if semanticNode.Label == "" && node.Data.Domain != "" {
-			semanticNode.Label = node.Data.Domain
-		}
 	case "internalLinkNode":
 		semanticNode.Kind = "internal_link"
 		if node.Data.Element != nil {
@@ -72,8 +69,6 @@ func (p *GraphPreprocessor) convertNode(node models.GNode) models.SemanticNode {
 	if semanticNode.Label == "" {
 		if node.Data.Description != "" {
 			semanticNode.Label = node.Data.Description
-		} else if node.Data.Domain != "" {
-			semanticNode.Label = node.Data.Domain
 		}
 	}
 

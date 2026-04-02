@@ -19,59 +19,58 @@ type LLMClient interface {
 
 // ImageRecognitionFlow represents the output structure for image recognition
 type ImageRecognitionFlow struct {
-	ImageDescription string `json:"imageDescription"`
+	ImageDescription string `json:"imageDescription" jsonschema:"description=Описание содержимого изображения"`
 }
 
 // SummarizeFlow represents the output structure for summarization
 type SummarizeFlow struct {
-	Summarization string `json:"summarization"`
+	Summarization string `json:"summarization" jsonschema:"description=Текст суммаризации содержимого доски"`
 }
 
 // TemplateGenerationFlow represents the output structure for template generation
 type TemplateGenerationFlow struct {
-	BoardType    string            `json:"boardType"`
-	Title        string            `json:"title"`
-	Description  string            `json:"description"`
-	Elements     []TemplateElement `json:"elements,omitempty"`
-	GraphNodes   []TemplateNode    `json:"graphNodes,omitempty"`
-	GraphEdges   []TemplateEdge    `json:"graphEdges,omitempty"`
+	BoardType    string            `json:"boardType" jsonschema:"description=Тип сгенерированной доски: simple или graph"`
+	Title        string            `json:"title" jsonschema:"description=Заголовок доски"`
+	Description  string            `json:"description" jsonschema:"description=Описание содержимого доски"`
+	Elements     []TemplateElement `json:"elements,omitempty" jsonschema:"description=Элементы доски для simple board"`
+	GraphNodes   []TemplateNode    `json:"graphNodes,omitempty" jsonschema:"description=Узлы графа для graph board"`
+	GraphEdges   []TemplateEdge    `json:"graphEdges,omitempty" jsonschema:"description=Рёбра графа для graph board"`
 }
 
 // TemplateElement represents a board element for simple board
 type TemplateElement struct {
-	Type         string  `json:"type"`
-	X            float32 `json:"x"`
-	Y            float32 `json:"y"`
-	Width        float32 `json:"width"`
-	Height       float32 `json:"height"`
-	Rotation     float32 `json:"rotation"`
-	Fill         string  `json:"fill,omitempty"`
-	Stroke       string  `json:"stroke,omitempty"`
-	StrokeWidth  int     `json:"strokeWidth,omitempty"`
-	Content      string  `json:"content,omitempty"`
-	CornerRadius int     `json:"cornerRadius,omitempty"`
+	Type         string  `json:"type,omitempty" jsonschema:"description=Тип элемента: rectangle, text, ellipse, line"`
+	X            float32 `json:"x,omitempty" jsonschema:"description=Координата X левого верхнего угла"`
+	Y            float32 `json:"y,omitempty" jsonschema:"description=Координата Y левого верхнего угла"`
+	Width        float32 `json:"width,omitempty" jsonschema:"description=Ширина элемента"`
+	Height       float32 `json:"height,omitempty" jsonschema:"description=Высота элемента"`
+	Rotation     float32 `json:"rotation,omitempty" jsonschema:"description=Угол поворота в градусах"`
+	Fill         string  `json:"fill,omitempty" jsonschema:"description=Цвет заливки в формате hex"`
+	Stroke       string  `json:"stroke,omitempty" jsonschema:"description=Цвет обводки в формате hex"`
+	StrokeWidth  int     `json:"strokeWidth,omitempty" jsonschema:"description=Толщина обводки в пикселях"`
+	Content      string  `json:"content,omitempty" jsonschema:"description=Текстовое содержимое элемента"`
+	CornerRadius int     `json:"cornerRadius,omitempty" jsonschema:"description=Радиус скругления углов"`
+	// Additional text styling fields (optional, may be returned by LLM)
+	FontSize   int    `json:"fontSize,omitempty" jsonschema:"description=Размер шрифта"`
+	FontColor  string `json:"fontColor,omitempty" jsonschema:"description=Цвет текста в формате hex"`
+	FontFamily string `json:"fontFamily,omitempty" jsonschema:"description=Семейство шрифтов"`
 }
 
-// TemplateNode represents a graph node for graph board
+// TemplateNode represents a graph node for graph board (simplified - content only)
 type TemplateNode struct {
-	ID          string `json:"id"`
-	Type        string `json:"type"`
-	PositionX   float32 `json:"positionX"`
-	PositionY   float32 `json:"positionY"`
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	Shape       string `json:"shape"`
-	Color       string `json:"color,omitempty"`
-	URL         string `json:"url,omitempty"`
+	ID          string `json:"id" jsonschema:"description=Уникальный идентификатор узла"`
+	Type        string `json:"type" jsonschema:"description=Тип узла: customNode, externalLinkNode, internalLinkNode"`
+	Title       string `json:"title" jsonschema:"description=Заголовок узла"`
+	Description string `json:"description,omitempty" jsonschema:"description=Описание узла"`
+	URL         string `json:"url,omitempty" jsonschema:"description=URL для внешних ссылок"`
 }
 
-// TemplateEdge represents a graph edge for graph board
+// TemplateEdge represents a graph edge for graph board (simplified - connections only)
 type TemplateEdge struct {
-	ID     string `json:"id"`
-	Source string `json:"source"`
-	Target string `json:"target"`
-	Type   string `json:"type"`
-	Label  string `json:"label,omitempty"`
+	ID     string `json:"id" jsonschema:"description=Уникальный идентификатор ребра"`
+	Source string `json:"source" jsonschema:"description=ID исходного узла"`
+	Target string `json:"target" jsonschema:"description=ID целевого узла"`
+	Label  string `json:"label,omitempty" jsonschema:"description=Метка/описание связи"`
 }
 
 // For structurize, we'll define a flow that doesn't use the recursive File structure in its definition

@@ -338,7 +338,7 @@ func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID s
 		// Convert template elements to board elements
 		for _, elem := range template.Elements {
 			board.Elements = append(board.Elements, models.Element{
-				Id:           fmt.Sprintf("elem-%s", elem.Type),
+				Id:           fmt.Sprintf("elem-%d", len(board.Elements)),
 				Type:         elem.Type,
 				X:            elem.X,
 				Y:            elem.Y,
@@ -358,15 +358,9 @@ func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID s
 			board.GraphNodes = append(board.GraphNodes, models.GNode{
 				ID:   node.ID,
 				Type: node.Type,
-				Position: models.GPosition{
-					X: node.PositionX,
-					Y: node.PositionY,
-				},
 				Data: models.GNodeData{
 					Title:       node.Title,
 					Description: node.Description,
-					Shape:       node.Shape,
-					Color:       node.Color,
 					URL:         node.URL,
 				},
 			})
@@ -376,7 +370,6 @@ func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID s
 		for _, edge := range template.GraphEdges {
 			board.GraphEdges = append(board.GraphEdges, models.GEdge{
 				ID:     edge.ID,
-				Type:   edge.Type,
 				Source: edge.Source,
 				Target: edge.Target,
 				Label:  edge.Label,

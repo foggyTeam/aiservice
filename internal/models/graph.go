@@ -1,58 +1,33 @@
 package models
 
-// GNode represents a React Flow graph node
+// GNode represents a React Flow graph node (simplified - content only, no visual details)
 type GNode struct {
-	ID       string    `json:"id"`
-	Type     string    `json:"type"` // customNode, externalLinkNode, internalLinkNode, nodeLinkNode
-	Position GPosition `json:"position"`
-	Data     GNodeData `json:"data"`
+	ID   string    `json:"id" jsonschema:"description=Уникальный идентификатор узла"`
+	Type string    `json:"type" jsonschema:"description=Тип узла: customNode, externalLinkNode, internalLinkNode, nodeLinkNode"`
+	Data GNodeData `json:"data" jsonschema:"description=Данные узла"`
 }
 
-// GPosition represents the position of a graph node
-type GPosition struct {
-	X float32 `json:"x"`
-	Y float32 `json:"y"`
-}
-
-// GNodeData represents the data of a graph node
+// GNodeData represents the data of a graph node (content only, no visual details)
 type GNodeData struct {
-	Title       string        `json:"title,omitempty"`
-	Description string        `json:"description,omitempty"`
-	Shape       string        `json:"shape,omitempty"`
-	Color       string        `json:"color,omitempty"`
-	URL         string        `json:"url,omitempty"`
-	Domain      string        `json:"domain,omitempty"`
-	Favicon     string        `json:"favicon,omitempty"`
-	ThumbnailURL string       `json:"thumbnailUrl,omitempty"`
-	Element     *GraphElement `json:"element,omitempty"`
+	Title       string        `json:"title,omitempty" jsonschema:"description=Заголовок узла"`
+	Description string        `json:"description,omitempty" jsonschema:"description=Описание узла"`
+	URL         string        `json:"url,omitempty" jsonschema:"description=URL для внешних ссылок"`
+	Element     *GraphElement `json:"element,omitempty" jsonschema:"description=Элемент проекта для внутренних ссылок"`
 }
 
 // GraphElement represents an internal link element
 type GraphElement struct {
-	Type  string   `json:"type"`
-	Title string   `json:"title"`
-	Path  []string `json:"path"`
+	Type  string   `json:"type" jsonschema:"description=Тип элемента проекта"`
+	Title string   `json:"title" jsonschema:"description=Заголовок элемента"`
+	Path  []string `json:"path" jsonschema:"description=Путь к элементу"`
 }
 
-// GEdge represents a React Flow graph edge
+// GEdge represents a React Flow graph edge (simplified - connections only, no visual details)
 type GEdge struct {
-	ID           string      `json:"id"`
-	Type         string      `json:"type"` // default, smoothstep, straight, step, simplebezier
-	Source       string      `json:"source"`
-	Target       string      `json:"target"`
-	SourceHandle string      `json:"sourceHandle,omitempty"`
-	TargetHandle string      `json:"targetHandle,omitempty"`
-	Label        string      `json:"label,omitempty"`
-	Animated     bool        `json:"animated,omitempty"`
-	Style        *GEdgeStyle `json:"style,omitempty"`
-}
-
-// GEdgeStyle represents the style of a graph edge
-type GEdgeStyle struct {
-	Stroke        string `json:"stroke,omitempty"`
-	StrokeWidth   int    `json:"strokeWidth,omitempty"`
-	StrokeLinecap string `json:"strokeLinecap,omitempty"`
-	StrokeDasharray string `json:"strokeDasharray,omitempty"`
+	ID     string `json:"id" jsonschema:"description=Уникальный идентификатор ребра"`
+	Source string `json:"source" jsonschema:"description=ID исходного узла"`
+	Target string `json:"target" jsonschema:"description=ID целевого узла"`
+	Label  string `json:"label,omitempty" jsonschema:"description=Метка/описание связи"`
 }
 
 // SemanticGraph represents a semantic representation of a graph for LLM
@@ -63,16 +38,16 @@ type SemanticGraph struct {
 
 // SemanticNode represents a semantic graph node
 type SemanticNode struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Kind        string `json:"kind"` // component, service, database, external_link, internal_link, navigation
-	Description string `json:"description,omitempty"`
-	URL         string `json:"url,omitempty"`
+	ID          string `json:"id" jsonschema:"description=Уникальный идентификатор узла"`
+	Label       string `json:"label" jsonschema:"description=Заголовок/название узла"`
+	Kind        string `json:"kind" jsonschema:"description=Тип узла: component, service, database, external_link, internal_link, navigation"`
+	Description string `json:"description,omitempty" jsonschema:"description=Описание узла"`
+	URL         string `json:"url,omitempty" jsonschema:"description=URL для внешних ссылок"`
 }
 
 // SemanticEdge represents a semantic graph edge
 type SemanticEdge struct {
-	From  string `json:"from"`
-	To    string `json:"to"`
-	Label string `json:"label,omitempty"`
+	From  string `json:"from" jsonschema:"description=ID исходного узла"`
+	To    string `json:"to" jsonschema:"description=ID целевого узла"`
+	Label string `json:"label,omitempty" jsonschema:"description=Метка/описание связи"`
 }
