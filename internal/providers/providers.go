@@ -29,12 +29,12 @@ type SummarizeFlow struct {
 
 // TemplateGenerationFlow represents the output structure for template generation
 type TemplateGenerationFlow struct {
-	BoardType    string            `json:"boardType" jsonschema:"description=Тип сгенерированной доски: simple или graph"`
-	Title        string            `json:"title" jsonschema:"description=Заголовок доски"`
-	Description  string            `json:"description" jsonschema:"description=Описание содержимого доски"`
-	Elements     []TemplateElement `json:"elements,omitempty" jsonschema:"description=Элементы доски для simple board"`
-	GraphNodes   []TemplateNode    `json:"graphNodes,omitempty" jsonschema:"description=Узлы графа для graph board"`
-	GraphEdges   []TemplateEdge    `json:"graphEdges,omitempty" jsonschema:"description=Рёбра графа для graph board"`
+	BoardType   string            `json:"boardType" jsonschema:"description=Тип сгенерированной доски: simple или graph"`
+	Title       string            `json:"title" jsonschema:"description=Заголовок доски"`
+	Description string            `json:"description" jsonschema:"description=Описание содержимого доски"`
+	Elements    []TemplateElement `json:"elements,omitempty" jsonschema:"description=Элементы доски для simple board"`
+	GraphNodes  []TemplateNode    `json:"graphNodes,omitempty" jsonschema:"description=Узлы графа для graph board"`
+	GraphEdges  []TemplateEdge    `json:"graphEdges,omitempty" jsonschema:"description=Рёбра графа для graph board"`
 }
 
 // TemplateElement represents a board element for simple board
@@ -182,5 +182,5 @@ func RunStructurizeGenerationAndConvert(ctx context.Context, gkit *genkit.Genkit
 
 // StructurizeFlow represents the output structure for structurization (used in pipeline)
 type StructurizeFlow struct {
-	AiTreeResponse string `json:"aiTreeResponse"`
+	AiTreeResponse string `json:"aiTreeResponse" jsonschema:"description=ASCII tree representation of file structure"`
 }

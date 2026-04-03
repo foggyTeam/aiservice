@@ -176,7 +176,8 @@ func main() {
 		var aiReqBody []byte
 		var requestType string
 
-		if *mode == "summarize" {
+		switch *mode {
+		case "summarize":
 			sumReq := models.SummarizeRequest{
 				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
 				UserID:      *userID,
@@ -189,14 +190,14 @@ func main() {
 			}
 			aiReqBody, _ = json.Marshal(sumReq)
 			requestType = "summarize"
-		} else if *mode == "structurize" {
+		case "structurize":
 			structReq := models.StructurizeRequest{
 				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
 				UserID:      *userID,
 				RequestType: "structurize",
 				Board: models.Board{
 					BoardID:  foggyBoard.ID,
-					ImageURL: "",
+					ImageURL: "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_E0bwLdwqSAxYMnZnVzUGcPnNVqWKH6BGQQxw0N44db7.jpeg",
 					Elements: elements,
 				},
 				File: models.File{
@@ -207,7 +208,7 @@ func main() {
 			}
 			aiReqBody, _ = json.Marshal(structReq)
 			requestType = "structurize"
-		} else if *mode == "template" {
+		case "template":
 			templateReq := models.GenerateTemplateRequest{
 				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
 				UserID:      *userID,

@@ -98,21 +98,7 @@ GRAPH STRUCTURE формат:
 Мне нужно, чтобы ты предоставил ответ в следующем формате JSON:
 {
   "aiTreeResponse": "ASCII дерево файлов (например: project─┬─src\n              └─main.go)",
-  "file": {
-    "nodes": [
-      {"id": "1", "name": "project", "type": "section", "parentId": null},
-      {"id": "2", "name": "src", "type": "section", "parentId": "1"},
-      {"id": "3", "name": "main.go", "type": "doc", "parentId": "2"}
-    ],
-    "rootIds": ["1"]
-  }
 }
-
-Требования:
-- nodes - плоский список всех узлов файловой структуры
-- rootIds - ID корневых узлов (обычно один)
-- parentId - ссылается на ID родительского узла (null для корня)
-- type: "section" для папок, "doc" для файлов
 `
 
 // Preprocessor transforms raw input data into structured formats for AI processing

@@ -93,13 +93,18 @@ func newImageCleanupStep() Step {
 
 func newDigitalInkAnalysisStep() Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		// Only process digital ink for summarization requests
-		if state.AnalyzeRequest.RequestType != models.SummarizeType {
+		var lineElements []models.Element
+		switch state.AnalyzeRequest.RequestType {
+		case models.SummarizeType:
+			lineElements = extractLineElements(state.AnalyzeRequest.SummarizeRequest.Board.Elements)
+			slog.Debug("starting digital ink analysis for summarize request")
+		case models.StructurizeType:
+			lineElements = extractLineElements(state.AnalyzeRequest.StructurizeRequest.Board.Elements)
+			slog.Debug("starting digital ink analysis for structurize request")
+		default:
+			slog.Debug("unknown request type, skipping digital ink analysis", "type", state.AnalyzeRequest.RequestType)
 			return nil
 		}
-
-		// Extract line elements for handwriting recognition
-		lineElements := extractLineElements(state.AnalyzeRequest.SummarizeRequest.Board.Elements)
 
 		// Skip if no line elements found
 		if len(lineElements) == 0 {
@@ -143,10 +148,11 @@ func newGraphPreprocessingStep() Step {
 		var graphNodes []models.GNode
 		var graphEdges []models.GEdge
 
-		if state.AnalyzeRequest.RequestType == models.SummarizeType {
+		switch state.AnalyzeRequest.RequestType {
+		case models.SummarizeType:
 			graphNodes = state.AnalyzeRequest.SummarizeRequest.Board.GraphNodes
 			graphEdges = state.AnalyzeRequest.SummarizeRequest.Board.GraphEdges
-		} else if state.AnalyzeRequest.RequestType == models.StructurizeType {
+		case models.StructurizeType:
 			graphNodes = state.AnalyzeRequest.StructurizeRequest.Board.GraphNodes
 			graphEdges = state.AnalyzeRequest.StructurizeRequest.Board.GraphEdges
 		}
