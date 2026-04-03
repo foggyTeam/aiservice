@@ -95,10 +95,12 @@ GRAPH STRUCTURE формат:
 1) Проанализируй всё предоставленное описание
 2) Создай файловую структуру проекта на основе содержимого доски
 
-Мне нужно, чтобы ты предоставил ответ в следующем формате JSON:
-{
-  "aiTreeResponse": "ASCII дерево файлов (например: project─┬─src\n              └─main.go)",
-}
+Мне нужно, чтобы ты предоставил ответ в формате ASCII TREE дерева. Вот пример:
+main/
+├── test
+│   ├── doc.x
+│   └── file.txt
+└── test.go
 `
 
 // Preprocessor transforms raw input data into structured formats for AI processing
