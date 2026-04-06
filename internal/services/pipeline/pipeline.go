@@ -54,7 +54,6 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 			newImageRecognitionStep(llm),
 			newSummarizeStep(llm),
 			newFillSummarizeResponseStep(),
-			newImageCleanupStep(),
 		), nil
 	case models.StructurizeType:
 		return NewPipeline(
@@ -64,7 +63,6 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 			newImageRecognitionStep(llm),
 			newStructurizeStep(llm),
 			newFillStructurizeResponseStep(),
-			newImageCleanupStep(),
 		), nil
 	case models.GenerateTemplateType:
 		return NewPipeline(

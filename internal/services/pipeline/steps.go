@@ -79,18 +79,6 @@ func newImageDownloadStep() Step {
 	}
 }
 
-func newImageCleanupStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		// Cleanup image after processing (only for Ollama)
-		if state.ImageDownloadResult != nil && imageService != nil {
-			if err := imageService.DeleteImage(state.ImageDownloadResult.LocalPath); err != nil {
-				slog.Warn("failed to cleanup image", "err", err)
-			}
-		}
-		return nil
-	}
-}
-
 func newDigitalInkAnalysisStep() Step {
 	return func(ctx context.Context, state *PipelineState) error {
 		var lineElements []models.Element
@@ -340,7 +328,8 @@ func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID s
 		GraphEdges: make([]models.GEdge, 0),
 	}
 
-	if template.BoardType == "simple" {
+	switch template.BoardType {
+	case "simple":
 		// Convert template elements to board elements
 		for _, elem := range template.Elements {
 			board.Elements = append(board.Elements, models.Element{
@@ -358,7 +347,7 @@ func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID s
 				CornerRadius: elem.CornerRadius,
 			})
 		}
-	} else if template.BoardType == "graph" {
+	case "graph":
 		// Convert template nodes to graph nodes
 		for _, node := range template.GraphNodes {
 			board.GraphNodes = append(board.GraphNodes, models.GNode{

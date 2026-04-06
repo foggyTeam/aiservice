@@ -2,29 +2,34 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/aiservice/internal/models"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/labstack/echo/v4"
 )
 
 type AnalyzeHandler struct {
-	service     *analysis.AnalysisService
-	jobQueue    *jobservice.JobQueueService
-	syncTimeout time.Duration
+	service             *analysis.AnalysisService
+	jobQueue            *jobservice.JobQueueService
+	syncTimeout         time.Duration
+	incrementalAnalyzer *analysis.IncrementalAnalyzer
 }
 
 func NewAnalyzeHandler(
 	service *analysis.AnalysisService,
 	jobQueue *jobservice.JobQueueService,
 	syncTimeout time.Duration,
+	incrementalAnalyzer *analysis.IncrementalAnalyzer,
 ) *AnalyzeHandler {
 	return &AnalyzeHandler{
-		service:     service,
-		jobQueue:    jobQueue,
-		syncTimeout: syncTimeout,
+		service:             service,
+		jobQueue:            jobQueue,
+		syncTimeout:         syncTimeout,
+		incrementalAnalyzer: incrementalAnalyzer,
 	}
 }
 
@@ -78,4 +83,36 @@ func HealthHandler(c echo.Context) error {
 		"status": "ok",
 		"time":   time.Now().Format(time.RFC3339),
 	})
+}
+
+// SummarizeIncremental handles incremental summarization requests
+// @Summary Incremental board analysis
+// @Description Analyze board changes incrementally
+// @Tags Analysis
+// @Accept json
+// @Produce json
+// @Param request body models.IncrementalAnalysisRequest true "Incremental Analysis Request"
+// @Success 200 {object} models.IncrementalAnalysisResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /summarize/incremental [post]
+func (h *AnalyzeHandler) SummarizeIncremental(c echo.Context) error {
+	var req models.IncrementalAnalysisRequest
+
+	if err := c.Bind(&req); err != nil {
+		slog.Error("bind error:", "err", err)
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
+	}
+
+	if req.BoardID == "" {
+		return c.JSON(http.StatusBadRequest, fmt.Errorf("boardId is required"))
+	}
+
+	resp, err := h.incrementalAnalyzer.Analyze(c.Request().Context(), req)
+	if err != nil {
+		slog.Error("incremental analysis failed:", "err", err)
+		return c.JSON(http.StatusInternalServerError, fmt.Errorf("analysis failed: %w", err))
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }

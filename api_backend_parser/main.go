@@ -78,9 +78,11 @@ type GoogleCandidate struct {
 func main() {
 	// Parse command line flags
 	boardID := flag.String("board", "69a7f58476e8c3b1fb9705c1", "Board ID to fetch from foggy backend")
-	mode := flag.String("mode", "summarize", "Mode: summarize, structurize, or template")
+	mode := flag.String("mode", "summarize", "Mode: summarize, structurize, template, or incremental")
 	prompt := flag.String("prompt", "", "Prompt for template generation (required for template mode)")
 	boardType := flag.String("board-type", "simple", "Board type for template: simple or graph (default: simple)")
+	incremental := flag.Bool("incremental", false, "Use incremental analysis mode (requires previous cache)")
+	fullRescan := flag.Bool("full-rescan", false, "Force full rescan in incremental mode")
 	foggyURL := flag.String("foggy-url", "http://localhost:3001", "Foggy backend URL")
 	aiServiceURL := flag.String("ai-url", "http://localhost:8080", "AIService URL")
 	userID := flag.String("user", "parser-user", "User ID for the request")
@@ -98,6 +100,11 @@ func main() {
 	if *mode == "template" && *boardType != "simple" && *boardType != "graph" {
 		fmt.Fprintf(os.Stderr, "Error: -board-type must be 'simple' or 'graph'\n")
 		os.Exit(1)
+	}
+
+	// If incremental flag is set, override mode to incremental
+	if *incremental {
+		*mode = "incremental"
 	}
 
 	fmt.Printf("Fetching board %s from %s...\n", *boardID, *foggyURL)
@@ -219,13 +226,26 @@ func main() {
 			}
 			aiReqBody, _ = json.Marshal(templateReq)
 			requestType = "template"
+		case "incremental":
+			// Incremental analysis request
+			incReq := models.IncrementalAnalysisRequest{
+				BoardID:      foggyBoard.ID,
+				IsFullRescan: *fullRescan,
+				FullBoard: &models.Board{
+					BoardID:  foggyBoard.ID,
+					ImageURL: "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_E0bwLdwqSAxYMnZnVzUGcPnNVqWKH6BGQQxw0N44db7.jpeg",
+					Elements: elements,
+				},
+			}
+			aiReqBody, _ = json.Marshal(incReq)
+			requestType = "summarize/incremental"
 		}
 
 		// Send to AIService
 		aiEndpoint := fmt.Sprintf("%s/%s", *aiServiceURL, requestType)
 		fmt.Printf("Sending %s request to %s...\n", requestType, aiEndpoint)
 
-		fmt.Println(string(aiReqBody))
+		// fmt.Println(string(aiReqBody))
 
 		aiResp, err := http.Post(aiEndpoint, "application/json", bytes.NewBuffer(aiReqBody))
 		if err != nil {

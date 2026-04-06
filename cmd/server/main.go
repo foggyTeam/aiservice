@@ -24,6 +24,7 @@ import (
 	"github.com/aiservice/internal/providers/gemini"
 	"github.com/aiservice/internal/providers/ollama"
 	"github.com/aiservice/internal/services/analysis"
+	servicecache "github.com/aiservice/internal/services/cache"
 	"github.com/aiservice/internal/services/database"
 	"github.com/aiservice/internal/services/image"
 	jobservice "github.com/aiservice/internal/services/jobService"
@@ -102,9 +103,23 @@ func main() {
 
 	// Initialize image service
 	imageService := image.NewService(os.Getenv("IMAGES_DIR"), 5*time.Minute)
+	
+	// Start background image cleaner (TTL: 5 minutes)
+	imageService.StartCleaner(ctx, 5*time.Minute)
 
 	// Create the analysis service without the job queue initially
 	analysisService := analysis.NewAnalysisServiceWithoutJobQueue(cfg.Timeouts.SyncProcess, wrappedLLMClient, imageService, cfg.LLM.Provider)
+
+	// Initialize incremental analysis components
+	cacheService := servicecache.NewAnalysisCacheService(1*time.Hour, 10)
+	cropper := image.NewImageCropper()
+	
+	incrementalAnalyzer := analysis.NewIncrementalAnalyzer(
+		cacheService,
+		cropper,
+		wrappedLLMClient,
+		analysisService,
+	)
 
 	// Create the job queue service with the analysis service as the processor
 	jobQueueService := jobservice.NewJobQueueService(
@@ -153,6 +168,7 @@ func main() {
 		analysisService,
 		jobQueueService,
 		cfg.Timeouts.SyncProcess,
+		incrementalAnalyzer,
 	)
 
 	TemplateHandler := handlers.NewTemplateHandler(analysisService)
@@ -163,6 +179,7 @@ func main() {
 	e.POST("/summarize", AnalyzeHandler.Summarize)
 	e.POST("/structurize", AnalyzeHandler.Structurize)
 	e.POST("/template", TemplateHandler.TemplateRequest)
+	e.POST("/summarize/incremental", AnalyzeHandler.SummarizeIncremental)
 
 	startServer(ctx, cancel, cfg, jobQueueService, e)
 }
@@ -220,8 +237,8 @@ func initOllama(ctx context.Context, cfg *config.Config) providers.LLMClient {
 		slog.Error("Please set OLLAMA_BASE_URL environment variable (e.g., http://localhost:11434)")
 		os.Exit(1)
 	}
-	slog.Info("Initializing Ollama provider", 
-		"text_model", cfg.LLM.TextModel, 
+	slog.Info("Initializing Ollama provider",
+		"text_model", cfg.LLM.TextModel,
 		"vision_model", cfg.LLM.VisionModel,
 		"url", cfg.LLM.BaseURL)
 	return ollama.NewOllamaClient(ctx, cfg.LLM)
