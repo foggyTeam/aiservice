@@ -23,6 +23,8 @@ type PipelineState struct {
 	SemanticGraph          *models.SemanticGraph
 	TemplateGenerationFlow providers.TemplateGenerationFlow
 	GeneratedBoard         *models.Board
+
+	BoardTextContent string
 }
 
 type Step func(ctx context.Context, state *PipelineState) error
@@ -50,6 +52,7 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 		return NewPipeline(
 			newImageDownloadStep(),
 			newDigitalInkAnalysisStep(),
+			newBoardTextExtractionStep(),
 			newGraphPreprocessingStep(),
 			newImageRecognitionStep(llm),
 			newSummarizeStep(llm),
@@ -59,6 +62,7 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 		return NewPipeline(
 			newImageDownloadStep(),
 			newDigitalInkAnalysisStep(),
+			newBoardTextExtractionStep(),
 			newGraphPreprocessingStep(),
 			newImageRecognitionStep(llm),
 			newStructurizeStep(llm),

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/aiservice/internal/digitalink"
 	"github.com/aiservice/internal/models"
@@ -219,14 +220,56 @@ func newImageRecognitionStep(llm providers.LLMClient) Step {
 	}
 }
 
+func newBoardTextExtractionStep() Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		var elements []models.Element
+		switch state.AnalyzeRequest.RequestType {
+		case models.SummarizeType:
+			elements = state.AnalyzeRequest.SummarizeRequest.Board.Elements
+		case models.StructurizeType:
+			elements = state.AnalyzeRequest.StructurizeRequest.Board.Elements
+		default:
+			return nil
+		}
+
+		state.BoardTextContent = formatTextElementsContent(elements)
+		if state.BoardTextContent != "" {
+			slog.Debug("extracted board text content", "chars", len(state.BoardTextContent))
+		}
+		return nil
+	}
+}
+
+func formatTextElementsContent(elements []models.Element) string {
+	var builder strings.Builder
+	for _, elem := range elements {
+		if elem.Type != "text" {
+			continue
+		}
+		content := strings.TrimSpace(elem.Content)
+		if content == "" {
+			continue
+		}
+		if builder.Len() > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString("- ")
+		builder.WriteString(content)
+	}
+	return builder.String()
+}
+
 func newSummarizeStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		// Prepare dynamic data for user message using preprocessor
 		userData := preprocessing.PreprocessSummarizeData(
 			state.ImageRecognitionFlow.ImageDescription,
 			state.DigitalInkText,
 			state.SemanticGraph,
 		)
+
+		if state.BoardTextContent != "" {
+			userData = fmt.Sprintf("%s\n\nBoard text elements detected on the board:\n%s", userData, state.BoardTextContent)
+		}
 
 		parts := []*ai.Part{
 			ai.NewTextPart(userData),
@@ -289,12 +332,15 @@ func createTextElementFromSummarization(summarization string, state *PipelineSta
 
 func newStructurizeStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
-		// Prepare dynamic data for user message using preprocessor
 		userData := preprocessing.PreprocessStructurizeData(
 			state.ImageRecognitionFlow.ImageDescription,
 			state.DigitalInkText,
 			state.SemanticGraph,
 		)
+
+		if state.BoardTextContent != "" {
+			userData = fmt.Sprintf("%s\n\nBoard text elements detected on the board:\n%s", userData, state.BoardTextContent)
+		}
 
 		parts := []*ai.Part{
 			ai.NewTextPart(userData),
