@@ -2,13 +2,16 @@ basePath: /
 definitions:
   models.AnalyzeRequest:
     properties:
+      incrementalRequest:
+        $ref: '#/definitions/models.IncrementalAnalysisRequest'
       requestType:
-        description: summarize, structurize
         type: string
       structurizeRequest:
         $ref: '#/definitions/models.StructurizeRequest'
       summarizeRequest:
         $ref: '#/definitions/models.SummarizeRequest'
+      templateRequest:
+        $ref: '#/definitions/models.GenerateTemplateRequest'
     type: object
   models.Board:
     properties:
@@ -18,9 +21,35 @@ definitions:
         items:
           $ref: '#/definitions/models.Element'
         type: array
+      graphEdges:
+        items:
+          $ref: '#/definitions/models.GEdge'
+        type: array
+      graphNodes:
+        items:
+          $ref: '#/definitions/models.GNode'
+        type: array
       imageUrl:
         type: string
     type: object
+  models.BoardType:
+    enum:
+    - simple
+    - graph
+    type: string
+    x-enum-varnames:
+    - BoardTypeSimple
+    - BoardTypeGraph
+  models.ChangeType:
+    enum:
+    - added
+    - modified
+    - deleted
+    type: string
+    x-enum-varnames:
+    - ChangeAdded
+    - ChangeModified
+    - ChangeDeleted
   models.Element:
     properties:
       content:
@@ -30,30 +59,24 @@ definitions:
         description: inserted from rectangle model
         type: integer
       fill:
-        description: цвет заливки
         type: string
       height:
         type: number
       id:
         type: string
       points:
-        description: '[x, y], [x, y]'
         items:
           type: number
         type: array
       rotation:
         type: number
       stroke:
-        description: цвет обводки
         type: string
       strokeWidth:
-        description: толщина обводки
         type: integer
       tension:
-        description: давление
         type: number
       type:
-        description: rect, line, text, ellipse,
         type: string
       width:
         type: number
@@ -62,6 +85,17 @@ definitions:
       "y":
         type: number
     type: object
+  models.ElementChange:
+    properties:
+      changeType:
+        $ref: '#/definitions/models.ChangeType'
+      elementId:
+        type: string
+      newElement:
+        $ref: '#/definitions/models.Element'
+      oldElement:
+        $ref: '#/definitions/models.Element'
+    type: object
   models.File:
     properties:
       children:
@@ -69,18 +103,121 @@ definitions:
           $ref: '#/definitions/models.File'
         type: array
       name:
-        example: main.go
         type: string
       type:
-        description: doc, simple, graph,(поле children пустое) | section (содердит
-          детей)
-        example: doc
+        type: string
+    type: object
+  models.GEdge:
+    properties:
+      id:
+        type: string
+      label:
+        type: string
+      source:
+        type: string
+      target:
+        type: string
+    type: object
+  models.GNode:
+    properties:
+      data:
+        $ref: '#/definitions/models.GNodeData'
+      id:
+        type: string
+      type:
+        type: string
+    type: object
+  models.GNodeData:
+    properties:
+      description:
+        type: string
+      element:
+        $ref: '#/definitions/models.GraphElement'
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+  models.GenerateTemplateRequest:
+    properties:
+      boardId:
+        type: string
+      boardType:
+        $ref: '#/definitions/models.BoardType'
+      prompt:
+        type: string
+      requestId:
+        type: string
+      requestType:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.GenerateTemplateResponse:
+    properties:
+      board:
+        $ref: '#/definitions/models.Board'
+      requestId:
+        type: string
+      requestType:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.GraphElement:
+    properties:
+      path:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  models.IncrementalAnalysisRequest:
+    properties:
+      boardId:
+        type: string
+      changes:
+        items:
+          $ref: '#/definitions/models.ElementChange'
+        type: array
+      fullBoard:
+        $ref: '#/definitions/models.Board'
+      isFullRescan:
+        type: boolean
+      requestId:
+        type: string
+      requestType:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.IncrementalAnalysisResponse:
+    properties:
+      globalSummary:
+        type: string
+      isFullRescan:
+        type: boolean
+      keyConcepts:
+        items:
+          type: string
+        type: array
+      requestId:
+        type: string
+      requestType:
+        type: string
+      updatedRegions:
+        items:
+          type: string
+        type: array
+      userId:
         type: string
     type: object
   models.Job:
     properties:
       createdAt:
-        format: int64
         type: integer
       id:
         type: string
@@ -114,7 +251,6 @@ definitions:
       requestId:
         type: string
       requestType:
-        description: structurize
         type: string
       userId:
         type: string
@@ -122,14 +258,12 @@ definitions:
   models.StructurizeResponse:
     properties:
       aiTreeResponse:
-        description: дерево ASCII файлов
         type: string
       file:
         $ref: '#/definitions/models.File'
       requestId:
         type: string
       requestType:
-        description: structurize
         type: string
       userId:
         type: string
@@ -141,7 +275,6 @@ definitions:
       requestId:
         type: string
       requestType:
-        description: summarize
         type: string
       userId:
         type: string
@@ -151,13 +284,9 @@ definitions:
       requestId:
         type: string
       requestType:
-        description: summarize
         type: string
       text:
-        allOf:
-        - $ref: '#/definitions/models.Text'
-        description: конкретный элемент - текст, который суммаризовал инфу по доске,
-          расположенный в свободном пространстве доски
+        $ref: '#/definitions/models.Text'
       userId:
         type: string
     type: object
@@ -166,7 +295,6 @@ definitions:
       content:
         type: string
       fill:
-        description: цвет заливки
         type: string
       height:
         type: number
@@ -175,13 +303,10 @@ definitions:
       rotation:
         type: number
       stroke:
-        description: цвет обводки
         type: string
       strokeWidth:
-        description: толщина обводки
         type: integer
       type:
-        description: rect, line, text, ellipse,
         type: string
       width:
         type: number
@@ -353,6 +478,82 @@ paths:
       summary: Summarize a board
       tags:
       - Processing
+  /summarize/incremental:
+    post:
+      consumes:
+      - application/json
+      description: Analyze board changes incrementally
+      parameters:
+      - description: Incremental Analysis Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.IncrementalAnalysisRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.IncrementalAnalysisResponse'
+        "202":
+          description: Job ID
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Incremental board analysis
+      tags:
+      - Analysis
+  /template:
+    post:
+      consumes:
+      - application/json
+      description: Generate a board template from a text prompt
+      parameters:
+      - description: Generate Template Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.GenerateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.GenerateTemplateResponse'
+        "202":
+          description: Job ID
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Generate board template
+      tags:
+      - Template
 schemes:
 - http
 - https

@@ -25,6 +25,15 @@ type PipelineState struct {
 	GeneratedBoard         *models.Board
 
 	BoardTextContent string
+
+	// Incremental analysis fields
+	IncrementalCache      *models.BoardAnalysisCache
+	IncrementalChanges    []models.ElementChange
+	IncrementalRegions   []models.RegionSummary
+	IncrementalCrops     []string
+	IncrementalBBoxes    []models.BoundingBox
+	IncrementalFullImage []byte
+	IncrementalResponse  models.IncrementalAnalysisResponse
 }
 
 type Step func(ctx context.Context, state *PipelineState) error
@@ -73,6 +82,22 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 			newTemplateGenerationStep(llm),
 			newConvertTemplateToBoardStep(),
 			newFillTemplateResponseStep(),
+		), nil
+	case models.IncrementalType:
+		return NewPipeline(
+			newIncrementalCacheCheckStep(),
+			newIncrementalFullRescanCheckStep(),
+			newIncrementalChangeDetectionStep(),
+			newIncrementalNoChangesCheckStep(),
+			newIncrementalRegionDetectionStep(),
+			newIncrementalImageDownloadStep(),
+			newIncrementalImageCropStep(),
+			newIncrementalMergeCropsStep(),
+			newIncrementalFallbackCheckStep(),
+			newIncrementalPromptBuildStep(),
+			newIncrementalLLMAnalysisStep(llm),
+			newIncrementalCacheUpdateStep(),
+			newIncrementalResponseStep(),
 		), nil
 	default:
 		return nil, fmt.Errorf("unsupported input type: %s", t)

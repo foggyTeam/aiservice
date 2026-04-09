@@ -6,6 +6,7 @@ const (
 	SummarizeType        = "summarize"
 	StructurizeType      = "structurize"
 	GenerateTemplateType = "generateTemplate"
+	IncrementalType      = "incremental"
 )
 
 const (
@@ -96,10 +97,11 @@ type Board struct {
 }
 
 type AnalyzeRequest struct {
-	RequestType        string `json:"requestType"`
-	SummarizeRequest   SummarizeRequest
-	StructurizeRequest StructurizeRequest
-	TemplateRequest    GenerateTemplateRequest
+	RequestType          string                      `json:"requestType"`
+	SummarizeRequest     SummarizeRequest
+	StructurizeRequest   StructurizeRequest
+	TemplateRequest      GenerateTemplateRequest
+	IncrementalRequest   IncrementalAnalysisRequest
 }
 
 func NewSumAnalyzeReq(req SummarizeRequest) AnalyzeRequest {
@@ -114,10 +116,15 @@ func NewTemplateAnalyzeReq(req GenerateTemplateRequest) AnalyzeRequest {
 	return AnalyzeRequest{RequestType: GenerateTemplateType, TemplateRequest: req}
 }
 
+func NewIncrementalAnalyzeReq(req IncrementalAnalysisRequest) AnalyzeRequest {
+	return AnalyzeRequest{RequestType: IncrementalType, IncrementalRequest: req}
+}
+
 type AnalyzeResponse struct {
-	SummarizeResponse   SummarizeResponse
-	StructurizeResponse StructurizeResponse
-	TemplateResponse    GenerateTemplateResponse
+	SummarizeResponse     SummarizeResponse
+	StructurizeResponse   StructurizeResponse
+	TemplateResponse      GenerateTemplateResponse
+	IncrementalResponse   IncrementalAnalysisResponse
 }
 
 type SummarizeRequest struct {

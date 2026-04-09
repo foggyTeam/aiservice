@@ -79,16 +79,22 @@ const (
 
 // IncrementalAnalysisRequest represents a request for incremental analysis
 type IncrementalAnalysisRequest struct {
-	BoardID       string          `json:"boardId"`
-	Changes       []ElementChange `json:"changes"`
-	FullBoard     *Board          `json:"fullBoard,omitempty"`
-	IsFullRescan  bool            `json:"isFullRescan"`
+	RequestID    string          `json:"requestId"`
+	UserID       string          `json:"userId"`
+	RequestType  string          `json:"requestType"`
+	BoardID      string          `json:"boardId"`
+	Changes      []ElementChange `json:"changes"`
+	FullBoard    *Board          `json:"fullBoard,omitempty"`
+	IsFullRescan bool            `json:"isFullRescan"`
 }
 
 // IncrementalAnalysisResponse represents the response from incremental analysis
 type IncrementalAnalysisResponse struct {
-	GlobalSummary string   `json:"globalSummary"`
-	KeyConcepts   []string `json:"keyConcepts"`
+	RequestID      string   `json:"requestId"`
+	UserID         string   `json:"userId"`
+	RequestType    string   `json:"requestType"`
+	GlobalSummary  string   `json:"globalSummary"`
+	KeyConcepts    []string `json:"keyConcepts"`
 	UpdatedRegions []string `json:"updatedRegions"`
-	IsFullRescan  bool     `json:"isFullRescan"`
+	IsFullRescan   bool     `json:"isFullRescan"`
 }

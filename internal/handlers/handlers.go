@@ -9,27 +9,25 @@ import (
 	"github.com/aiservice/internal/models"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
+	"github.com/aiservice/internal/utils"
 	"github.com/labstack/echo/v4"
 )
 
 type AnalyzeHandler struct {
-	service             *analysis.AnalysisService
-	jobQueue            *jobservice.JobQueueService
-	syncTimeout         time.Duration
-	incrementalAnalyzer *analysis.IncrementalAnalyzer
+	service     *analysis.AnalysisService
+	jobQueue    *jobservice.JobQueueService
+	syncTimeout time.Duration
 }
 
 func NewAnalyzeHandler(
 	service *analysis.AnalysisService,
 	jobQueue *jobservice.JobQueueService,
 	syncTimeout time.Duration,
-	incrementalAnalyzer *analysis.IncrementalAnalyzer,
 ) *AnalyzeHandler {
 	return &AnalyzeHandler{
-		service:             service,
-		jobQueue:            jobQueue,
-		syncTimeout:         syncTimeout,
-		incrementalAnalyzer: incrementalAnalyzer,
+		service:     service,
+		jobQueue:    jobQueue,
+		syncTimeout: syncTimeout,
 	}
 }
 
@@ -93,6 +91,7 @@ func HealthHandler(c echo.Context) error {
 // @Produce json
 // @Param request body models.IncrementalAnalysisRequest true "Incremental Analysis Request"
 // @Success 200 {object} models.IncrementalAnalysisResponse
+// @Success 202 {string} string "Job ID"
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /summarize/incremental [post]
@@ -108,11 +107,21 @@ func (h *AnalyzeHandler) SummarizeIncremental(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, fmt.Errorf("boardId is required"))
 	}
 
-	resp, err := h.incrementalAnalyzer.Analyze(c.Request().Context(), req)
+	// Set request type if not set
+	if req.RequestType == "" {
+		req.RequestType = models.IncrementalType
+	}
+
+	// Use standard job processing through pipeline
+	resp, err := h.service.StartJob(c.Request().Context(), models.NewIncrementalAnalyzeReq(req))
 	if err != nil {
+		if acceptedErr, ok := utils.MapErr[analysis.ErrAccepted](err); ok {
+			slog.Info("enqueue job:", "jobID", acceptedErr.JobID)
+			return c.JSON(http.StatusAccepted, acceptedErr.JobID)
+		}
 		slog.Error("incremental analysis failed:", "err", err)
 		return c.JSON(http.StatusInternalServerError, fmt.Errorf("analysis failed: %w", err))
 	}
 
-	return c.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, resp.IncrementalResponse)
 }

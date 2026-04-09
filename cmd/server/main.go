@@ -114,12 +114,9 @@ func main() {
 	cacheService := servicecache.NewAnalysisCacheService(1*time.Hour, 10)
 	cropper := image.NewImageCropper()
 	
-	incrementalAnalyzer := analysis.NewIncrementalAnalyzer(
-		cacheService,
-		cropper,
-		wrappedLLMClient,
-		analysisService,
-	)
+	// Set cache service and cropper on analysis service
+	analysisService.SetCacheService(cacheService)
+	analysisService.SetCropper(cropper)
 
 	// Create the job queue service with the analysis service as the processor
 	jobQueueService := jobservice.NewJobQueueService(
@@ -168,7 +165,6 @@ func main() {
 		analysisService,
 		jobQueueService,
 		cfg.Timeouts.SyncProcess,
-		incrementalAnalyzer,
 	)
 
 	TemplateHandler := handlers.NewTemplateHandler(analysisService)
