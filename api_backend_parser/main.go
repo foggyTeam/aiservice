@@ -25,6 +25,56 @@ type FoggyBoard struct {
 	UpdatedAt  string           `json:"updatedAt"`
 }
 
+// FoggySnapshot represents the snapshot response from foggy backend
+type FoggySnapshot struct {
+	BoardID string          `json:"boardId"`
+	Type    string          `json:"type"`
+	State   FoggyBoardState `json:"state"`
+}
+
+// FoggyBoardState represents the state object inside snapshot
+type FoggyBoardState struct {
+	Nodes []FoggySnapshotNode `json:"nodes"`
+	Edges []FoggySnapshotEdge `json:"edges"`
+}
+
+// FoggySnapshotNode represents a graph node in the snapshot
+type FoggySnapshotNode struct {
+	ID       string            `json:"id"`
+	Type     string            `json:"type"`
+	Position FoggyNodePosition `json:"position"`
+	Data     FoggyNodeData     `json:"data"`
+	Selected bool              `json:"selected"`
+	Hidden   bool              `json:"hidden"`
+}
+
+// FoggyNodePosition represents the position of a node
+type FoggyNodePosition struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+// FoggyNodeData represents the data of a node
+type FoggyNodeData struct {
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	Domain      string `json:"domain"`
+	Description string `json:"description"`
+	Shape       string `json:"shape"`
+	Align       string `json:"align"`
+	Thumbnail   string `json:"thumbnailUrl"`
+	Favicon     string `json:"favicon"`
+}
+
+// FoggySnapshotEdge represents a graph edge in the snapshot
+type FoggySnapshotEdge struct {
+	ID     string `json:"id"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Label  string `json:"label"`
+	Type   string `json:"type"`
+}
+
 // FoggyElement represents an element from foggy backend
 type FoggyElement struct {
 	ID           string    `json:"id"`
@@ -144,6 +194,26 @@ func main() {
 	elements := transformElements(foggyBoard)
 	fmt.Printf("Transformed elements: %d\n", len(elements))
 
+	// Fetch snapshot for graph board type
+	var snapshot *FoggySnapshot
+	var graphNodes []models.GNode
+	var graphEdges []models.GEdge
+
+	if *boardType == "graph" {
+		fmt.Printf("Fetching board snapshot for graph data...\n")
+		snapshot, err = fetchBoardSnapshot(*foggyURL, *boardID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to fetch board snapshot, continuing without graph data: %v\n", err)
+			snapshot = nil
+		} else if snapshot != nil {
+			fmt.Printf("Snapshot fetched: %d nodes, %d edges\n", len(snapshot.State.Nodes), len(snapshot.State.Edges))
+			graphNodes = transformSnapshotNodes(snapshot.State.Nodes)
+			graphEdges = transformSnapshotEdges(snapshot.State.Edges)
+		}
+	} else {
+		fmt.Printf("Board type is 'simple', skipping snapshot fetch\n")
+	}
+
 	var responseBody []byte
 
 	// Route to Google API or AIService based on flag
@@ -183,6 +253,7 @@ func main() {
 		var aiReqBody []byte
 		var requestType string
 
+		imageURL := ""
 		switch *mode {
 		case "summarize":
 			sumReq := models.SummarizeRequest{
@@ -191,7 +262,7 @@ func main() {
 				RequestType: "summarize",
 				Board: models.Board{
 					BoardID:  foggyBoard.ID,
-					ImageURL: "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_E0bwLdwqSAxYMnZnVzUGcPnNVqWKH6BGQQxw0N44db7.jpeg",
+					ImageURL: imageURL,
 					Elements: elements,
 				},
 			}
@@ -203,9 +274,11 @@ func main() {
 				UserID:      *userID,
 				RequestType: "structurize",
 				Board: models.Board{
-					BoardID:  foggyBoard.ID,
-					ImageURL: "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_E0bwLdwqSAxYMnZnVzUGcPnNVqWKH6BGQQxw0N44db7.jpeg",
-					Elements: elements,
+					BoardID:    foggyBoard.ID,
+					ImageURL:   imageURL,
+					Elements:   elements,
+					GraphNodes: graphNodes,
+					GraphEdges: graphEdges,
 				},
 				File: models.File{
 					Name:     sanitizeName(foggyBoard.Name),
@@ -232,9 +305,11 @@ func main() {
 				BoardID:      foggyBoard.ID,
 				IsFullRescan: *fullRescan,
 				FullBoard: &models.Board{
-					BoardID:  foggyBoard.ID,
-					ImageURL: "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_E0bwLdwqSAxYMnZnVzUGcPnNVqWKH6BGQQxw0N44db7.jpeg",
-					Elements: elements,
+					BoardID:    foggyBoard.ID,
+					ImageURL:   imageURL,
+					Elements:   elements,
+					GraphNodes: graphNodes,
+					GraphEdges: graphEdges,
 				},
 			}
 			aiReqBody, _ = json.Marshal(incReq)
@@ -470,4 +545,93 @@ func sendToGoogleAPI(requestBody []byte, language string) []byte {
 	}
 
 	return body
+}
+
+// fetchBoardSnapshot fetches board snapshot from foggy backend
+func fetchBoardSnapshot(foggyURL, boardID string) (*FoggySnapshot, error) {
+	foggyURL = "http://localhost:1234"
+	snapshotURL := fmt.Sprintf("%s/boards/%s/snapshot", foggyURL, boardID)
+
+	req, err := http.NewRequest("GET", snapshotURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set required headers
+	req.Header.Set("x-service-key", "YqKZEMF0XtamKgoJ7H6IIWdBukSTY3Vt49tCOEbuFAefESRykOuMRmvrMkkjQeRa")
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("snapshot API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var snapshot FoggySnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snapshot); err != nil {
+		return nil, fmt.Errorf("failed to parse snapshot: %w", err)
+	}
+
+	return &snapshot, nil
+}
+
+// transformSnapshotNodes converts snapshot nodes to models.GNode
+func transformSnapshotNodes(nodes []FoggySnapshotNode) []models.GNode {
+	var graphNodes []models.GNode
+
+	for _, node := range nodes {
+		gNode := models.GNode{
+			ID:   node.ID,
+			Type: mapNodeType(node.Type),
+			Data: models.GNodeData{
+				Title:       node.Data.Title,
+				Description: node.Data.Description,
+				URL:         node.Data.URL,
+			},
+		}
+		graphNodes = append(graphNodes, gNode)
+	}
+
+	return graphNodes
+}
+
+// transformSnapshotEdges converts snapshot edges to models.GEdge
+func transformSnapshotEdges(edges []FoggySnapshotEdge) []models.GEdge {
+	var graphEdges []models.GEdge
+
+	for _, edge := range edges {
+		gEdge := models.GEdge{
+			ID:     edge.ID,
+			Source: edge.Source,
+			Target: edge.Target,
+			Label:  edge.Label,
+		}
+		graphEdges = append(graphEdges, gEdge)
+	}
+
+	return graphEdges
+}
+
+// mapNodeType maps foggy node type to our node type
+func mapNodeType(foggyType string) string {
+	switch foggyType {
+	case "customNode", "custom":
+		return "customNode"
+	case "externalLink", "external":
+		return "externalLinkNode"
+	case "internalLink", "internal":
+		return "internalLinkNode"
+	case "nodeLink", "link":
+		return "nodeLinkNode"
+	default:
+		return "customNode"
+	}
 }

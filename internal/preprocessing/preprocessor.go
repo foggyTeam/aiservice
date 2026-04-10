@@ -32,15 +32,7 @@ const GenerateTemplatePrompt = `
 - Title и description должны кратко описывать сгенерированную доску
 `
 
-const ImageRecognitionPrompt = `
-Что ты видишь на доске?
-Опиши всё, что видишь: текст, графы, схемы, рисунки и другие элементы.
-
-Ответ верни в формате JSON:
-{
-  "imageDescription": "Всё, что ты видишь на доске"
-}
-`
+const ImageRecognitionPrompt = `Что ты видишь на картинке?`
 
 // SummarizeSystemPrompt contains fixed instructions for summarization
 const SummarizeSystemPrompt = `

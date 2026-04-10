@@ -151,6 +151,7 @@ func newDigitalInkAnalysisStep() Step {
 			return nil
 		}
 
+		slog.Info("digital ink recognition result:", "", recognizedText)
 		// Cache the result
 		inkCache.Set(cacheKey, recognizedText)
 		slog.Debug("ink recognition cached", "key", cacheKey[:16]+"...", "text_len", len(recognizedText))
@@ -244,6 +245,7 @@ func newImageRecognitionStep(llm providers.LLMClient) Step {
 			slog.Warn("image recognition failed", "err", err)
 			return nil
 		}
+		slog.Info("image recognition result:", "", resp.ImageDescription)
 
 		state.ImageRecognitionFlow = resp
 		return nil
@@ -309,6 +311,7 @@ func newSummarizeStep(llm providers.LLMClient) Step {
 		if err != nil {
 			return err
 		}
+		slog.Info("summarize result:", "", resp.Summarization)
 
 		state.SummarizeFlow = resp
 		return nil

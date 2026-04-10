@@ -196,7 +196,7 @@ func findMaxDimensions(elements []models.Element) (float32, float32) {
 }
 
 // extractRecognizedTextFromRaw extracts text from Google API raw array response
-// Response format: [status, [[candidate1, candidate2, ...], [candidate1, candidate2, ...]], extra_data]
+// Response format: ["SUCCESS", [[id, [text1, text2, ...], [], {...}]], extra_data]
 func extractRecognizedTextFromRaw(rawResp RawGoogleHandwritingResponse) string {
 	if len(rawResp) < 2 {
 		return ""
@@ -211,24 +211,21 @@ func extractRecognizedTextFromRaw(rawResp RawGoogleHandwritingResponse) string {
 	var recognizedTexts []string
 
 	for _, item := range candidatesArray {
-		// Each item is an array of candidates: [{text: "..."}, {text: "..."}, ...]
+		// Each item is an array: [id, [text1, text2, ...], [], {...}]
 		candidates, ok := item.([]any)
-		if !ok || len(candidates) == 0 {
+		if !ok || len(candidates) < 2 {
 			continue
 		}
 
-		// Take first candidate
-		if candidate, ok := candidates[0].(map[string]any); ok {
-			// Try different possible keys for the text
-			if text, exists := candidate["1"]; exists {
-				if textStr, ok := text.(string); ok && textStr != "" {
-					recognizedTexts = append(recognizedTexts, textStr)
-				}
-			} else if text, exists := candidate["text"]; exists {
-				if textStr, ok := text.(string); ok && textStr != "" {
-					recognizedTexts = append(recognizedTexts, textStr)
-				}
-			}
+		// candidates[1] contains the array of recognized texts
+		texts, ok := candidates[1].([]any)
+		if !ok || len(texts) == 0 {
+			continue
+		}
+
+		// Take first (best) text
+		if text, ok := texts[0].(string); ok && text != "" {
+			recognizedTexts = append(recognizedTexts, text)
 		}
 	}
 
