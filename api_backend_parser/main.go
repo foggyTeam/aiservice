@@ -253,7 +253,7 @@ func main() {
 		var aiReqBody []byte
 		var requestType string
 
-		imageURL := ""
+		imageURL := "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_Af91MeCizhoeAJyQ6gBk5wQLTT3iFi1SqcY1mHyvLum.jpeg"
 		switch *mode {
 		case "summarize":
 			sumReq := models.SummarizeRequest{

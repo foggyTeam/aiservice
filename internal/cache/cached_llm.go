@@ -248,3 +248,7 @@ func (c *CachedLLMClient) shortKey(key string) string {
 	}
 	return key
 }
+
+func (c *CachedLLMClient) SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.SummarizeFlow, error) {
+	return c.client.SummarizeWithHistory(ctx, history, parts)
+}

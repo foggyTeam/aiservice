@@ -138,3 +138,30 @@ func (g *GeminiClient) ImageRecognition(ctx context.Context, parts []*ai.Part) (
 
 	return flow, nil
 }
+
+func (g *GeminiClient) SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.SummarizeFlow, error) {
+	systemMsg := ai.NewSystemMessage(ai.NewTextPart(preprocessing.SummarizeSystemPrompt))
+	userMsg := ai.NewUserMessage(parts...)
+
+	// Combine System + History + User
+	messages := []*ai.Message{systemMsg}
+	messages = append(messages, history...)
+	messages = append(messages, userMsg)
+
+	resp, err := genkit.Generate(ctx, g.gkit,
+		ai.WithMessages(messages...),
+		ai.WithOutputType(&providers.SummarizeFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate summary with history:", "err", err)
+		return providers.SummarizeFlow{}, err
+	}
+
+	var flow providers.SummarizeFlow
+	if err := resp.Output(&flow); err != nil {
+		slog.Error("could not parse summary output with history:", "err", err)
+		return providers.SummarizeFlow{}, err
+	}
+
+	return flow, nil
+}

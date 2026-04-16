@@ -12,6 +12,7 @@ import (
 type LLMClient interface {
 	ImageRecognition(ctx context.Context, parts []*ai.Part) (ImageRecognitionFlow, error)
 	Summarize(ctx context.Context, parts []*ai.Part) (SummarizeFlow, error)
+	SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (SummarizeFlow, error)
 	Structurize(ctx context.Context, parts []*ai.Part) (StructurizeFlow, error)
 	GenerateTemplate(ctx context.Context, parts []*ai.Part) (TemplateGenerationFlow, error)
 	GetName() string // Added for provider identification

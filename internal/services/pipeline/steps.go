@@ -22,6 +22,7 @@ import (
 	"github.com/aiservice/internal/services/image"
 	"github.com/aiservice/internal/utils"
 	"github.com/firebase/genkit/go/ai"
+	"github.com/firebase/genkit/go/core/x/session"
 )
 
 // Preprocessor for transforming raw data into structured formats
@@ -307,11 +308,35 @@ func newSummarizeStep(llm providers.LLMClient) Step {
 			ai.NewTextPart(userData),
 		}
 
-		resp, err := llm.Summarize(ctx, parts)
+		// Check for Session History
+		sess := session.FromContext[models.BoardSessionState](ctx)
+		if sess == nil {
+			// No session, call standard
+			resp, err := llm.Summarize(ctx, parts)
+			if err != nil {
+				return err
+			}
+			state.SummarizeFlow = resp
+			return nil
+		}
+		history := sess.State().Messages
+		genkitHistory := models.ToGenkitMessages(history)
+
+		// Call with history
+		resp, err := llm.SummarizeWithHistory(ctx, genkitHistory, parts)
 		if err != nil {
 			return err
 		}
-		slog.Info("summarize result:", "", resp.Summarization)
+
+		// Update Session
+		sessState := sess.State()
+		sessState.Messages = append(sessState.Messages,
+			models.MessageEntry{Role: "user", Content: userData},
+			models.MessageEntry{Role: "model", Content: resp.Summarization},
+		)
+		if err := sess.UpdateState(ctx, sessState); err != nil {
+			slog.Warn("Failed to update session state", "err", err)
+		}
 
 		state.SummarizeFlow = resp
 		return nil

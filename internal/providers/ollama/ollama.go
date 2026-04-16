@@ -199,3 +199,35 @@ func (o *OllamaClient) ImageRecognition(ctx context.Context, parts []*ai.Part) (
 
 	return flow, nil
 }
+
+func (o *OllamaClient) SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.SummarizeFlow, error) {
+	systemMsg := ai.NewSystemMessage(ai.NewTextPart(preprocessing.SummarizeSystemPrompt))
+	userMsg := ai.NewUserMessage(parts...)
+
+	// Combine System + History + User
+	messages := []*ai.Message{systemMsg}
+	messages = append(messages, history...)
+	messages = append(messages, userMsg)
+
+	if len(history) > 0 {
+		slog.Info("Using session history", "messageCount", len(history))
+	}
+
+	resp, err := genkit.Generate(ctx, o.gkit,
+		ai.WithModel(o.textModel),
+		ai.WithMessages(messages...),
+		ai.WithOutputType(&providers.SummarizeFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate summary with history:", "err", err)
+		return providers.SummarizeFlow{}, err
+	}
+
+	var flow providers.SummarizeFlow
+	if err := resp.Output(&flow); err != nil {
+		slog.Error("could not parse summary output with history:", "err", err)
+		return providers.SummarizeFlow{}, err
+	}
+
+	return flow, nil
+}

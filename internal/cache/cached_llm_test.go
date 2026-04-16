@@ -153,3 +153,7 @@ func TestCachedLLMClient_GetStats(t *testing.T) {
 	assert.Equal(t, int64(1), misses)
 	assert.Greater(t, size, int64(0))
 }
+
+func (m *mockLLMClient) SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.SummarizeFlow, error) {
+	return providers.SummarizeFlow{Summarization: "mock summary with history"}, nil
+}

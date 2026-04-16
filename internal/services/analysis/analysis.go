@@ -13,6 +13,7 @@ import (
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/pipeline"
 	"github.com/aiservice/internal/utils"
+	"github.com/firebase/genkit/go/core/x/session"
 )
 
 type ErrAccepted struct {
@@ -24,13 +25,14 @@ func (e ErrAccepted) Error() string {
 }
 
 type AnalysisService struct {
-	llm             providers.LLMClient
-	timeout         time.Duration
-	jobQueue        *jobservice.JobQueueService
-	imageService    *image.Service
-	cacheService    *cache.AnalysisCacheService
-	cropper         *image.ImageCropper
-	provider        string
+	llm          providers.LLMClient
+	timeout      time.Duration
+	jobQueue     *jobservice.JobQueueService
+	imageService *image.Service
+	cacheService *cache.AnalysisCacheService
+	cropper      *image.ImageCropper
+	sessionStore session.Store[models.BoardSessionState]
+	provider     string
 }
 
 func NewAnalysisService(timeout time.Duration, llm providers.LLMClient, jobQueue *jobservice.JobQueueService, imageService *image.Service, provider string) *AnalysisService {
@@ -66,6 +68,12 @@ func (s *AnalysisService) SetCacheService(cacheService *cache.AnalysisCacheServi
 // SetCropper sets the cropper for incremental analysis
 func (s *AnalysisService) SetCropper(cropper *image.ImageCropper) {
 	s.cropper = cropper
+}
+
+// SetSessionStore sets the session store for chat history
+func (s *AnalysisService) SetSessionStore(store session.Store[models.BoardSessionState]) {
+	s.sessionStore = store
+	slog.Info("Session store configured for analysis service")
 }
 
 func (s *AnalysisService) Abort(ctx context.Context, jobID string) error {
@@ -133,6 +141,15 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 	pipeline.SetCropper(s.cropper)
 	pipeline.SetLLMForIncremental(s.llm)
 
+	// Handle Session for Summarize
+	if req.RequestType == models.SummarizeType && s.sessionStore != nil {
+		boardID := s.extractBoardID(req)
+		if boardID != "" {
+			slog.Info("Initializing session for summarize request on board", "boardID", boardID)
+			ctx = s.initSession(ctx, boardID)
+		}
+	}
+
 	// Build pipeline state
 	state := &pipeline.PipelineState{
 		AnalyzeRequest: req,
@@ -150,15 +167,48 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 			slog.Info("Incremental analysis: no changes detected, returning cached result")
 			return models.AnalyzeResponse{IncrementalResponse: noChangesErr.Response}, nil
 		}
-		
+
 		// Check for incremental full rescan shortcut
 		if fullRescanErr, ok := utils.MapErr[*pipeline.ErrIncrementalFullRescan](err); ok {
 			slog.Info("Incremental analysis: full rescan performed")
 			return models.AnalyzeResponse{IncrementalResponse: fullRescanErr.Response}, nil
 		}
-		
+
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
 
 	return state.AnalyzeResponse, nil
+}
+
+func (s *AnalysisService) extractBoardID(req models.AnalyzeRequest) string {
+	switch req.RequestType {
+	case models.SummarizeType:
+		return req.SummarizeRequest.Board.BoardID
+	case models.StructurizeType:
+		return req.StructurizeRequest.Board.BoardID
+	case models.IncrementalType:
+		return req.IncrementalRequest.BoardID
+	default:
+		return ""
+	}
+}
+
+func (s *AnalysisService) initSession(ctx context.Context, boardID string) context.Context {
+	sess, err := session.Load(ctx, s.sessionStore, boardID)
+	if err != nil {
+		sess, err = session.New(ctx,
+			session.WithID[models.BoardSessionState](boardID),
+			session.WithStore(s.sessionStore),
+			session.WithInitialState(models.BoardSessionState{}),
+		)
+		if err != nil {
+			slog.Warn("Failed to create session", "err", err)
+			return ctx
+		}
+		slog.Info("Created new session for board", "boardID", boardID)
+	} else {
+		state := sess.State()
+		slog.Info("Retrieved existing session for board", "boardID", boardID, "messageCount", len(state.Messages))
+	}
+	return session.NewContext(ctx, sess)
 }
