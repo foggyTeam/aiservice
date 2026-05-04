@@ -14,6 +14,7 @@ type LLMClient interface {
 	Summarize(ctx context.Context, parts []*ai.Part) (SummarizeFlow, error)
 	SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (SummarizeFlow, error)
 	Structurize(ctx context.Context, parts []*ai.Part) (StructurizeFlow, error)
+	StructurizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (StructurizeFlow, error)
 	GenerateTemplate(ctx context.Context, parts []*ai.Part) (TemplateGenerationFlow, error)
 	GetName() string // Added for provider identification
 }

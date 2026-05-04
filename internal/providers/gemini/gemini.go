@@ -28,7 +28,7 @@ func NewGeminiClient(ctx context.Context, cfg config.LLMProviderConfig) *GeminiC
 	return &GeminiClient{
 		cfg:         cfg,
 		gkit:        gkit,
-		textModel:   nil,  // Gemini uses model name in Generate call
+		textModel:   nil, // Gemini uses model name in Generate call
 		visionModel: nil,
 	}
 }
@@ -161,6 +161,33 @@ func (g *GeminiClient) SummarizeWithHistory(ctx context.Context, history []*ai.M
 	if err := resp.Output(&flow); err != nil {
 		slog.Error("could not parse summary output with history:", "err", err)
 		return providers.SummarizeFlow{}, err
+	}
+
+	return flow, nil
+}
+
+func (g *GeminiClient) StructurizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.StructurizeFlow, error) {
+	systemMsg := ai.NewSystemMessage(ai.NewTextPart(preprocessing.StructurizeSystemPrompt))
+	userMsg := ai.NewUserMessage(parts...)
+
+	// Combine System + History + User
+	messages := []*ai.Message{systemMsg}
+	messages = append(messages, history...)
+	messages = append(messages, userMsg)
+
+	resp, err := genkit.Generate(ctx, g.gkit,
+		ai.WithMessages(messages...),
+		ai.WithOutputType(&providers.StructurizeFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate structurize with history:", "err", err)
+		return providers.StructurizeFlow{}, err
+	}
+
+	var flow providers.StructurizeFlow
+	if err := resp.Output(&flow); err != nil {
+		slog.Error("could not parse structurize output with history:", "err", err)
+		return providers.StructurizeFlow{}, err
 	}
 
 	return flow, nil

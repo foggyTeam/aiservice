@@ -160,32 +160,43 @@ func main() {
 	fmt.Printf("Fetching board %s from %s...\n", *boardID, *foggyURL)
 
 	// Fetch board from foggy backend
-	boardURL := fmt.Sprintf("%s/boards/%s", *foggyURL, *boardID)
-	resp, err := http.Get(boardURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error fetching board: %v\n", err)
-		os.Exit(1)
-	}
-	defer resp.Body.Close()
+	// boardURL := fmt.Sprintf("%s/boards/%s", *foggyURL, *boardID)
+	// resp, err := http.Get(boardURL)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error fetching board: %v\n", err)
+	// 	os.Exit(1)
+	// }
+	// defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
-		os.Exit(1)
-	}
+	// body, err := io.ReadAll(resp.Body)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+	// 	os.Exit(1)
+	// }
 
-	if resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "Error: foggy backend returned status %d\n", resp.StatusCode)
-		fmt.Fprintf(os.Stderr, "Response: %s\n", string(body))
-		os.Exit(1)
-	}
+	// if resp.StatusCode != http.StatusOK {
+	// 	fmt.Fprintf(os.Stderr, "Error: foggy backend returned status %d\n", resp.StatusCode)
+	// 	fmt.Fprintf(os.Stderr, "Response: %s\n", string(body))
+	// 	os.Exit(1)
+	// }
 
 	// Parse foggy board
-	var foggyBoard FoggyBoard
-	if err := json.Unmarshal(body, &foggyBoard); err != nil {
+	snapshotTmp, err := fetchBoardSnapshot2(fmt.Sprintf("%s/boards/%s", *foggyURL, *boardID), *boardID)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing foggy board: %v\n", err)
 		os.Exit(1)
 	}
+	foggyBoard := FoggyBoard{
+		ID:        snapshotTmp.BoardId,
+		ProjectID: snapshotTmp.BoardId,
+		Layers:    snapshotTmp.State.Layers,
+	}
+	foggyBoard.ID = *boardID
+	foggyBoard.ProjectID = *boardID
+	// if err := json.Unmarshal(body, &foggyBoard); err != nil {
+	// fmt.Fprintf(os.Stderr, "Error parsing foggy board: %v\n", err)
+	// os.Exit(1)
+	// }
 
 	fmt.Printf("Board fetched: %s (type: %s)\n", foggyBoard.Name, foggyBoard.Type)
 	fmt.Printf("Elements found: %d layers\n", len(foggyBoard.Layers))
@@ -253,7 +264,7 @@ func main() {
 		var aiReqBody []byte
 		var requestType string
 
-		imageURL := "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_Af91MeCizhoeAJyQ6gBk5wQLTT3iFi1SqcY1mHyvLum.jpeg"
+		imageURL := "https://storage.yandexcloud.net/foggy/board_images/board_temp_image_4pjWx02rPzGVU37y0gPVMb84QXFfFQzIqPks5KihQqX.jpeg"
 		switch *mode {
 		case "summarize":
 			sumReq := models.SummarizeRequest{
@@ -261,9 +272,11 @@ func main() {
 				UserID:      *userID,
 				RequestType: "summarize",
 				Board: models.Board{
-					BoardID:  foggyBoard.ID,
-					ImageURL: imageURL,
-					Elements: elements,
+					BoardID:    foggyBoard.ID,
+					ImageURL:   imageURL,
+					Elements:   elements,
+					GraphNodes: graphNodes,
+					GraphEdges: graphEdges,
 				},
 			}
 			aiReqBody, _ = json.Marshal(sumReq)
@@ -545,6 +558,50 @@ func sendToGoogleAPI(requestBody []byte, language string) []byte {
 	}
 
 	return body
+}
+
+type State struct {
+	Layers [][]FoggyElement `json:"layers"`
+}
+
+type Snapshot struct {
+	BoardId string `json:"boardId"`
+	State   State  `json:"state"`
+}
+
+func fetchBoardSnapshot2(foggyURL, boardID string) (Snapshot, error) {
+	foggyURL = "http://localhost:1234"
+	snapshotURL := fmt.Sprintf("%s/boards/%s/snapshot", foggyURL, boardID)
+
+	req, err := http.NewRequest("GET", snapshotURL, nil)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set required headers
+	req.Header.Set("x-service-key", "YqKZEMF0XtamKgoJ7H6IIWdBukSTY3Vt49tCOEbuFAefESRykOuMRmvrMkkjQeRa")
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return Snapshot{}, fmt.Errorf("snapshot API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var snapshot Snapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snapshot); err != nil {
+		return Snapshot{}, fmt.Errorf("failed to parse snapshot: %w", err)
+	}
+
+	return snapshot, nil
 }
 
 // fetchBoardSnapshot fetches board snapshot from foggy backend

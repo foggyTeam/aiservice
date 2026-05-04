@@ -128,7 +128,7 @@ func newDigitalInkAnalysisStep() Step {
 
 		// Skip if no line elements found
 		if len(lineElements) == 0 {
-			slog.Debug("no line elements found for digital ink analysis")
+			slog.Info("no line elements found for digital ink analysis")
 			return nil
 		}
 
@@ -404,9 +404,34 @@ func newStructurizeStep(llm providers.LLMClient) Step {
 			ai.NewTextPart(userData),
 		}
 
-		resp, err := llm.Structurize(ctx, parts)
+		// Check for Session History
+		sess := session.FromContext[models.BoardSessionState](ctx)
+		if sess == nil {
+			// No session, call standard
+			resp, err := llm.Structurize(ctx, parts)
+			if err != nil {
+				return err
+			}
+			state.StructurizeFlow = resp
+			return nil
+		}
+		history := sess.State().Messages
+		genkitHistory := models.ToGenkitMessages(history)
+
+		// Call with history
+		resp, err := llm.StructurizeWithHistory(ctx, genkitHistory, parts)
 		if err != nil {
 			return err
+		}
+
+		// Update Session
+		sessState := sess.State()
+		sessState.Messages = append(sessState.Messages,
+			models.MessageEntry{Role: "user", Content: userData},
+			models.MessageEntry{Role: "model", Content: "Structurization completed"}, // Note: StructurizeFlow doesn't have text content like SummarizeFlow
+		)
+		if err := sess.UpdateState(ctx, sessState); err != nil {
+			slog.Warn("Failed to update session state", "err", err)
 		}
 
 		state.StructurizeFlow = resp

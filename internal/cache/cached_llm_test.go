@@ -11,9 +11,9 @@ import (
 
 // mockLLMClient is a mock LLM client for testing
 type mockLLMClient struct {
-	summarizeFunc     func(ctx context.Context, parts []*ai.Part) (providers.SummarizeFlow, error)
-	structurizeFunc   func(ctx context.Context, parts []*ai.Part) (providers.StructurizeFlow, error)
-	callCount         int
+	summarizeFunc   func(ctx context.Context, parts []*ai.Part) (providers.SummarizeFlow, error)
+	structurizeFunc func(ctx context.Context, parts []*ai.Part) (providers.StructurizeFlow, error)
+	callCount       int
 }
 
 func (m *mockLLMClient) Summarize(ctx context.Context, parts []*ai.Part) (providers.SummarizeFlow, error) {
@@ -156,4 +156,8 @@ func TestCachedLLMClient_GetStats(t *testing.T) {
 
 func (m *mockLLMClient) SummarizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.SummarizeFlow, error) {
 	return providers.SummarizeFlow{Summarization: "mock summary with history"}, nil
+}
+
+func (m *mockLLMClient) StructurizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (providers.StructurizeFlow, error) {
+	return providers.StructurizeFlow{}, nil
 }

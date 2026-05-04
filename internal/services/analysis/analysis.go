@@ -141,11 +141,11 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 	pipeline.SetCropper(s.cropper)
 	pipeline.SetLLMForIncremental(s.llm)
 
-	// Handle Session for Summarize
-	if req.RequestType == models.SummarizeType && s.sessionStore != nil {
+	// Handle Session for Summarize and Structurize
+	if (req.RequestType == models.SummarizeType || req.RequestType == models.StructurizeType) && s.sessionStore != nil {
 		boardID := s.extractBoardID(req)
 		if boardID != "" {
-			slog.Info("Initializing session for summarize request on board", "boardID", boardID)
+			slog.Info("Initializing session for request on board", "requestType", req.RequestType, "boardID", boardID)
 			ctx = s.initSession(ctx, boardID)
 		}
 	}
