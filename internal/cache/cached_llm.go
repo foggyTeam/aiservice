@@ -183,6 +183,51 @@ func (c *CachedLLMClient) GenerateTemplate(ctx context.Context, parts []*ai.Part
 	return response, nil
 }
 
+func (c *CachedLLMClient) GenerateText(ctx context.Context, parts []*ai.Part) (string, error) {
+	// Generate cache key
+	cacheKey, err := c.generateCacheKey("generateText", parts)
+	if err != nil {
+		slog.Warn("LLM cache key generation failed, bypassing cache", "err", err)
+		return c.client.GenerateText(ctx, parts)
+	}
+
+	// Try to get from cache
+	c.mu.RLock()
+	if cachedValue, found := c.cache.Get(cacheKey); found {
+		c.mu.RUnlock()
+		if response, ok := cachedValue.(string); ok {
+			atomic.AddInt64(&c.hits, 1)
+			slog.Info("LLM cache HIT", "operation", "generateText", "key", c.shortKey(cacheKey))
+			return response, nil
+		}
+		c.mu.RLock()
+	}
+	c.mu.RUnlock()
+
+	// Cache miss - call the underlying client
+	atomic.AddInt64(&c.misses, 1)
+	slog.Info("LLM cache MISS", "operation", "generateText", "key", c.shortKey(cacheKey))
+
+	response, err := c.client.GenerateText(ctx, parts)
+	if err != nil {
+		return "", err
+	}
+
+	// Cache the result with size tracking
+	entrySize := c.estimateSize(response)
+	c.mu.Lock()
+	if c.currentSize+entrySize <= MaxCacheSize {
+		c.cache.Set(cacheKey, response, DefaultTTL)
+		c.currentSize += entrySize
+		slog.Debug("LLM response cached", "key", c.shortKey(cacheKey), "size", entrySize, "totalSize", c.currentSize)
+	} else {
+		slog.Debug("LLM cache full, skipping cache", "currentSize", c.currentSize, "entrySize", entrySize, "maxSize", MaxCacheSize)
+	}
+	c.mu.Unlock()
+
+	return response, nil
+}
+
 // GetName returns the underlying client name
 func (c *CachedLLMClient) GetName() string {
 	return c.client.GetName()

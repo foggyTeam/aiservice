@@ -27,8 +27,8 @@ type PipelineState struct {
 	BoardTextContent string
 
 	// Incremental analysis fields
-	IncrementalCache      *models.BoardAnalysisCache
-	IncrementalChanges    []models.ElementChange
+	IncrementalCache     *models.BoardAnalysisCache
+	IncrementalChanges   []models.ElementChange
 	IncrementalRegions   []models.RegionSummary
 	IncrementalCrops     []string
 	IncrementalBBoxes    []models.BoundingBox
@@ -82,6 +82,11 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 			newTemplateGenerationStep(llm),
 			newConvertTemplateToBoardStep(),
 			newFillTemplateResponseStep(),
+		), nil
+	case models.GenerateTextType:
+		return NewPipeline(
+			newTextGenerationStep(llm),
+			newFillTextResponseStep(),
 		), nil
 	case models.IncrementalType:
 		return NewPipeline(

@@ -40,6 +40,10 @@ func (m *mockLLMClient) GenerateTemplate(ctx context.Context, parts []*ai.Part) 
 	return providers.TemplateGenerationFlow{BoardType: "simple", Title: "mock template"}, nil
 }
 
+func (m *mockLLMClient) GenerateText(ctx context.Context, parts []*ai.Part) (string, error) {
+	return "mock generated text", nil
+}
+
 func (m *mockLLMClient) GetName() string {
 	return "mock"
 }

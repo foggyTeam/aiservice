@@ -16,6 +16,7 @@ type LLMClient interface {
 	Structurize(ctx context.Context, parts []*ai.Part) (StructurizeFlow, error)
 	StructurizeWithHistory(ctx context.Context, history []*ai.Message, parts []*ai.Part) (StructurizeFlow, error)
 	GenerateTemplate(ctx context.Context, parts []*ai.Part) (TemplateGenerationFlow, error)
+	GenerateText(ctx context.Context, parts []*ai.Part) (string, error)
 	GetName() string // Added for provider identification
 }
 
@@ -27,6 +28,10 @@ type ImageRecognitionFlow struct {
 // SummarizeFlow represents the output structure for summarization
 type SummarizeFlow struct {
 	Summarization string `json:"summarization" jsonschema:"description=Текст суммаризации содержимого доски"`
+}
+
+type TextGenerationFlow struct {
+	Content string `json:"content" jsonschema:"description=Сгенерированный текст, обернутый в HTML теги"`
 }
 
 // TemplateGenerationFlow represents the output structure for template generation

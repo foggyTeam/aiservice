@@ -147,11 +147,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *mode == "template" && *boardType != "simple" && *boardType != "graph" {
-		fmt.Fprintf(os.Stderr, "Error: -board-type must be 'simple' or 'graph'\n")
-		os.Exit(1)
-	}
-
 	// If incremental flag is set, override mode to incremental
 	if *incremental {
 		*mode = "incremental"
@@ -306,6 +301,17 @@ func main() {
 				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
 				UserID:      *userID,
 				RequestType: "generateTemplate",
+				BoardID:     foggyBoard.ID,
+				Prompt:      *prompt,
+				BoardType:   models.BoardType(*boardType),
+			}
+			aiReqBody, _ = json.Marshal(templateReq)
+			requestType = "template"
+		case "text":
+			templateReq := models.GenerateTemplateRequest{
+				RequestID:   fmt.Sprintf("foggy-%s-%d", foggyBoard.ID, time.Now().Unix()),
+				UserID:      *userID,
+				RequestType: "generateText",
 				BoardID:     foggyBoard.ID,
 				Prompt:      *prompt,
 				BoardType:   models.BoardType(*boardType),

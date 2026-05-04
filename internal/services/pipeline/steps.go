@@ -199,7 +199,21 @@ func newGraphPreprocessingStep() Step {
 	}
 }
 
-// newTemplateGenerationStep generates a board template from a prompt
+// newTextGenerationStep generates text from a prompt
+func newTextGenerationStep(llm providers.LLMClient) Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		parts := preprocessing.PreprocessGenerateTextRequest(state.AnalyzeRequest.TemplateRequest.Prompt)
+		slog.Info("generateText", "start", "")
+		resp, err := llm.GenerateText(ctx, parts)
+		if err != nil {
+			return err
+		}
+		slog.Info("generateText", "end. response", resp)
+		state.BoardTextContent = resp
+		return nil
+	}
+}
+
 func newTemplateGenerationStep(llm providers.LLMClient) Step {
 	return func(ctx context.Context, state *PipelineState) error {
 		// Prepare data for LLM
@@ -207,7 +221,6 @@ func newTemplateGenerationStep(llm providers.LLMClient) Step {
 			state.AnalyzeRequest.TemplateRequest.Prompt,
 			state.AnalyzeRequest.TemplateRequest.BoardType,
 		)
-
 		// Call LLM
 		resp, err := llm.GenerateTemplate(ctx, parts)
 		if err != nil {
@@ -394,6 +407,7 @@ func newStructurizeStep(llm providers.LLMClient) Step {
 			state.ImageRecognitionFlow.ImageDescription,
 			state.DigitalInkText,
 			state.SemanticGraph,
+			state.AnalyzeRequest.StructurizeRequest.File,
 		)
 
 		if state.BoardTextContent != "" {
@@ -502,6 +516,18 @@ func convertTemplateToBoard(template providers.TemplateGenerationFlow, boardID s
 	}
 
 	return board
+}
+
+func newFillTextResponseStep() Step {
+	return func(ctx context.Context, state *PipelineState) error {
+		state.AnalyzeResponse.TextResponse = models.TextResponse{
+			RequestID:   state.AnalyzeRequest.TemplateRequest.RequestID,
+			UserID:      state.AnalyzeRequest.TemplateRequest.UserID,
+			RequestType: state.AnalyzeRequest.TemplateRequest.RequestType,
+			Content:     state.BoardTextContent,
+		}
+		return nil
+	}
 }
 
 func newFillTemplateResponseStep() Step {

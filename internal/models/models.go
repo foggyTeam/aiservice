@@ -6,6 +6,7 @@ const (
 	SummarizeType        = "summarize"
 	StructurizeType      = "structurize"
 	GenerateTemplateType = "generateTemplate"
+	GenerateTextType     = "generateText"
 	IncrementalType      = "incremental"
 )
 
@@ -22,6 +23,7 @@ type BoardType string
 const (
 	BoardTypeSimple BoardType = "simple"
 	BoardTypeGraph  BoardType = "graph"
+	BoardTypeDOC    BoardType = "doc"
 )
 
 // type Rectangle struct {
@@ -88,20 +90,19 @@ type Element struct {
 }
 
 type Board struct {
-	BoardID       string         `json:"boardId" jsonschema:"description=Уникальный идентификатор доски"`
-	ImageURL      string         `json:"imageUrl,omitempty" jsonschema:"description=URL изображения доски"`
-	Elements      []Element      `json:"elements,omitempty" jsonschema:"description=Элементы доски (прямоугольники, текст, линии)"`
-	GraphNodes    []GNode        `json:"graphNodes,omitempty" jsonschema:"description=Узлы графа для React Flow досок"`
-	GraphEdges    []GEdge        `json:"graphEdges,omitempty" jsonschema:"description=Рёбра графа для React Flow досок"`
-	SemanticGraph *SemanticGraph `json:"-"`
+	BoardID    string    `json:"boardId" jsonschema:"description=Уникальный идентификатор доски"`
+	ImageURL   string    `json:"imageUrl,omitempty" jsonschema:"description=URL изображения доски"`
+	Elements   []Element `json:"elements,omitempty" jsonschema:"description=Элементы доски (прямоугольники, текст, линии)"`
+	GraphNodes []GNode   `json:"graphNodes,omitempty" jsonschema:"description=Узлы графа для React Flow досок"`
+	GraphEdges []GEdge   `json:"graphEdges,omitempty" jsonschema:"description=Рёбра графа для React Flow досок"`
 }
 
 type AnalyzeRequest struct {
-	RequestType          string                      `json:"requestType"`
-	SummarizeRequest     SummarizeRequest
-	StructurizeRequest   StructurizeRequest
-	TemplateRequest      GenerateTemplateRequest
-	IncrementalRequest   IncrementalAnalysisRequest
+	RequestType        string `json:"requestType"`
+	SummarizeRequest   SummarizeRequest
+	StructurizeRequest StructurizeRequest
+	TemplateRequest    GenerateTemplateRequest
+	IncrementalRequest IncrementalAnalysisRequest
 }
 
 func NewSumAnalyzeReq(req SummarizeRequest) AnalyzeRequest {
@@ -113,7 +114,7 @@ func NewStructAnalyzeReq(req StructurizeRequest) AnalyzeRequest {
 }
 
 func NewTemplateAnalyzeReq(req GenerateTemplateRequest) AnalyzeRequest {
-	return AnalyzeRequest{RequestType: GenerateTemplateType, TemplateRequest: req}
+	return AnalyzeRequest{RequestType: req.RequestType, TemplateRequest: req}
 }
 
 func NewIncrementalAnalyzeReq(req IncrementalAnalysisRequest) AnalyzeRequest {
@@ -121,10 +122,18 @@ func NewIncrementalAnalyzeReq(req IncrementalAnalysisRequest) AnalyzeRequest {
 }
 
 type AnalyzeResponse struct {
-	SummarizeResponse     SummarizeResponse
-	StructurizeResponse   StructurizeResponse
-	TemplateResponse      GenerateTemplateResponse
-	IncrementalResponse   IncrementalAnalysisResponse
+	SummarizeResponse   SummarizeResponse
+	StructurizeResponse StructurizeResponse
+	TemplateResponse    GenerateTemplateResponse
+	IncrementalResponse IncrementalAnalysisResponse
+	TextResponse        TextResponse
+}
+
+type TextResponse struct {
+	RequestID   string `json:"requestId" jsonschema:"description=Уникальный идентификатор запроса"`
+	UserID      string `json:"userId" jsonschema:"description=Уникальный идентификатор пользователя"`
+	RequestType string `json:"requestType" jsonschema:"description=Тип запроса: generateTemplate"`
+	Content     string `json:"content" jsonschema:"description=Текстовое содержимое"`
 }
 
 type SummarizeRequest struct {
@@ -221,7 +230,7 @@ func (r *GenerateTemplateRequest) Validate() error {
 		return fmt.Errorf("userId is required")
 	}
 
-	if r.RequestType != GenerateTemplateType {
+	if r.RequestType != GenerateTemplateType && r.RequestType != GenerateTextType {
 		return fmt.Errorf("requestType must be 'generateTemplate'")
 	}
 
@@ -245,8 +254,8 @@ func (r *GenerateTemplateRequest) Validate() error {
 		return fmt.Errorf("boardType is required")
 	}
 
-	if r.BoardType != BoardTypeSimple && r.BoardType != BoardTypeGraph {
-		return fmt.Errorf("boardType must be 'simple' or 'graph'")
+	if r.BoardType != BoardTypeSimple && r.BoardType != BoardTypeGraph && r.BoardType != BoardTypeDOC {
+		return fmt.Errorf("boardType must be 'simple', 'graph', or 'doc'")
 	}
 
 	return nil

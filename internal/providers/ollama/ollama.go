@@ -151,6 +151,27 @@ func (o *OllamaClient) GetName() string {
 	return "ollama"
 }
 
+func (o *OllamaClient) GenerateText(ctx context.Context, parts []*ai.Part) (string, error) {
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.GenererateTextPrompt),
+	)
+	userMsg := ai.NewUserMessage(parts...)
+	resp, err := genkit.Generate(ctx, o.gkit,
+		ai.WithMessages(systemMsg, userMsg),
+		ai.WithOutputType(&providers.TextGenerationFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate text:", "err", err)
+		return "", err
+	}
+	var textFlow providers.TextGenerationFlow
+	if err := resp.Output(&textFlow); err != nil {
+		slog.Error("could not parse text output:", "err", err)
+		return "", err
+	}
+	return textFlow.Content, nil
+}
+
 func (o *OllamaClient) GenerateTemplate(ctx context.Context, parts []*ai.Part) (providers.TemplateGenerationFlow, error) {
 	// System message - fixed instructions
 	systemMsg := ai.NewSystemMessage(

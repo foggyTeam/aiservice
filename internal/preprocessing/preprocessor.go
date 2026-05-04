@@ -32,6 +32,19 @@ const GenerateTemplatePrompt = `
 - Title и description должны кратко описывать сгенерированную доску
 `
 
+const GenererateTextPrompt = `
+Ты ассистент для генерации текста.
+
+Тебе предоставлен промпт от пользователя с описанием того, какой контент он хочет создать.
+
+Твоя задача:
+1) Проанализируй промпт пользователя
+2) Сгенерировать текст-ответ на запрос пользователя.
+
+Требования:
+- Content(твой ответ) должен быть обернут в HTML теги: <p>, <br>, <strong>, <em>, <ul>, <ol>, <li>
+`
+
 const ImageRecognitionPrompt = `Что ты видишь на картинке?`
 
 // SummarizeSystemPrompt contains fixed instructions for summarization
@@ -72,6 +85,7 @@ const StructurizeSystemPrompt = `
 1. IMAGE DESCRIPTION - описание того, что видно на изображении доски (текст, графы, схемы, рисунки)
 2. DIGITAL INK DATA - текст из рукописных заметок
 3. GRAPH STRUCTURE - семантическое представление графа (узлы и связи между ними)
+4. PROJECT STRUCTURE - иерархическое представление файловой структуры проекта (если есть)
 
 GRAPH STRUCTURE формат:
 {
@@ -85,14 +99,14 @@ GRAPH STRUCTURE формат:
 
 Твоя задача:
 1) Проанализируй всё предоставленное описание
-2) Создай файловую структуру проекта на основе содержимого доски
+2) Создай файловую структуру проекта на основе содержимого доски и предоставленной иерархии (если есть)
 
 Мне нужно, чтобы ты предоставил ответ в формате ASCII TREE дерева. Вот пример:
-main/
-├── test
-│   ├── doc.x
-│   └── file.txt
-└── test.go
+задачи
+├── процессы
+│   ├── тестовое задание
+│   └── договор
+└── регламент
 `
 
 // Preprocessor transforms raw input data into structured formats for AI processing
@@ -120,6 +134,13 @@ func PreprocessGenerateTemplateRequest(prompt string, boardType models.BoardType
 	return []*ai.Part{
 		ai.NewTextPart(userData.String()),
 	}
+}
+
+func PreprocessGenerateTextRequest(prompt string) []*ai.Part {
+	var userData strings.Builder
+	userData.WriteString("Generate a text content based on the user's prompt.")
+	fmt.Fprintf(&userData, "User prompt: %s\n", prompt)
+	return []*ai.Part{ai.NewTextPart(userData.String())}
 }
 
 // PreprocessSummarizeData prepares dynamic data for user message (data only, no instructions)
@@ -151,7 +172,7 @@ func PreprocessSummarizeData(imageDescription string, recognizedText string, sem
 }
 
 // PreprocessStructurizeData prepares dynamic data for user message (data only, no instructions)
-func PreprocessStructurizeData(imageDescription string, inkData string, semanticGraph *models.SemanticGraph) string {
+func PreprocessStructurizeData(imageDescription string, inkData string, semanticGraph *models.SemanticGraph, existedStructure models.File) string {
 	var userData strings.Builder
 
 	// Добавляем семантический граф если есть
@@ -175,39 +196,44 @@ func PreprocessStructurizeData(imageDescription string, inkData string, semantic
 		userData.WriteString(inkData)
 	}
 
+	if fileHierarchy := createFileHierarchyDescription(existedStructure); fileHierarchy != "" {
+		userData.WriteString("\n\n")
+		userData.WriteString("PROJECT STRUCTURE:\n")
+		userData.WriteString(fileHierarchy)
+	}
+
 	return userData.String()
 }
 
 // createFileHierarchyDescription generates a description of the requested file hierarchy
-func (p *Preprocessor) createFileHierarchyDescription(file models.File) string {
+func createFileHierarchyDescription(file models.File) string {
 	var sb strings.Builder
-
 	if file.IsEmpty() {
-		sb.WriteString("No specific file structure requested. Create an appropriate structure based on board content.\n")
-		return sb.String()
+		return ""
 	}
-
-	sb.WriteString(fmt.Sprintf("Requested Structure: %s (%s)\n", file.Name, file.Type))
-
+	sb.WriteString(file.Name)
 	if len(file.Children) > 0 {
-		sb.WriteString("Child Elements:\n")
-		p.writeFileTree(&sb, file.Children, 1)
+		sb.WriteString("\n")
+		writeFileTree(&sb, file.Children, "")
 	} else {
-		sb.WriteString("No child elements specified.\n")
+		sb.WriteString("\n")
 	}
-
 	return sb.String()
 }
 
 // writeFileTree recursively writes the file tree structure
-func (p *Preprocessor) writeFileTree(sb *strings.Builder, files []models.File, depth int) {
-	indent := strings.Repeat("  ", depth)
-
-	for _, file := range files {
-		sb.WriteString(fmt.Sprintf("%s- %s (%s)\n", indent, file.Name, file.Type))
-
+func writeFileTree(sb *strings.Builder, files []models.File, prefix string) {
+	for idx, file := range files {
+		isLast := idx == len(files)-1
+		branch := "├── "
+		childPrefix := prefix + "│   "
+		if isLast {
+			branch = "└── "
+			childPrefix = prefix + "    "
+		}
+		sb.WriteString(prefix + branch + file.Name + "\n")
 		if len(file.Children) > 0 {
-			p.writeFileTree(sb, file.Children, depth+1)
+			writeFileTree(sb, file.Children, childPrefix)
 		}
 	}
 }

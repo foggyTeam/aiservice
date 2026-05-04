@@ -118,6 +118,27 @@ func (g *GeminiClient) GenerateTemplate(ctx context.Context, parts []*ai.Part) (
 	return templateFlow, nil
 }
 
+func (c *GeminiClient) GenerateText(ctx context.Context, parts []*ai.Part) (string, error) {
+	systemMsg := ai.NewSystemMessage(
+		ai.NewTextPart(preprocessing.GenererateTextPrompt),
+	)
+	userMsg := ai.NewUserMessage(parts...)
+	resp, err := genkit.Generate(ctx, c.gkit,
+		ai.WithMessages(systemMsg, userMsg),
+		ai.WithOutputType(&providers.TextGenerationFlow{}),
+	)
+	if err != nil {
+		slog.Error("could not generate text:", "err", err)
+		return "", err
+	}
+	var textFlow providers.TextGenerationFlow
+	if err := resp.Output(&textFlow); err != nil {
+		slog.Error("could not parse text output:", "err", err)
+		return "", err
+	}
+	return textFlow.Content, nil
+}
+
 func (g *GeminiClient) ImageRecognition(ctx context.Context, parts []*ai.Part) (providers.ImageRecognitionFlow, error) {
 	prompt := ai.NewUserMessage(parts...)
 
