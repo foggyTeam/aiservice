@@ -28,3 +28,5 @@ coverage.txt
 # Temporary files
 *.tmp
 *.log
+swag
+.qwen
