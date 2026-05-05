@@ -17,12 +17,13 @@ import (
 
 	"github.com/aiservice/internal/cache"
 	"github.com/aiservice/internal/config"
-	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/handlers"
 	"github.com/aiservice/internal/log"
 	authmiddleware "github.com/aiservice/internal/middleware"
+	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/providers"
 	"github.com/aiservice/internal/providers/gemini"
+	"github.com/aiservice/internal/providers/mock"
 	"github.com/aiservice/internal/providers/ollama"
 	"github.com/aiservice/internal/services/analysis"
 	servicecache "github.com/aiservice/internal/services/cache"
@@ -51,7 +52,7 @@ import (
 // @schemes http https
 func main() {
 	// Parse command line flags
-	providerFlag := flag.String("provider", "", "LLM provider to use (ollama, gemini, yandex). Overrides LLM_PROVIDER env var")
+	providerFlag := flag.String("provider", "", "LLM provider to use (ollama, gemini, mock). Overrides LLM_PROVIDER env var")
 	flag.Parse()
 
 	cfg := config.LoadFromEnv()
@@ -105,7 +106,7 @@ func main() {
 
 	// Initialize image service
 	imageService := image.NewService(os.Getenv("IMAGES_DIR"), 5*time.Minute)
-	
+
 	// Start background image cleaner (TTL: 5 minutes)
 	imageService.StartCleaner(ctx, 5*time.Minute)
 
@@ -115,7 +116,7 @@ func main() {
 	// Initialize incremental analysis components
 	cacheService := servicecache.NewAnalysisCacheService(1*time.Hour, 10)
 	cropper := image.NewImageCropper()
-	
+
 	// Initialize Session Store for chat history
 	chatStore := session.NewInMemoryStore[models.BoardSessionState]()
 
@@ -217,6 +218,10 @@ func startServer(ctx context.Context, cancelAiServices context.CancelFunc, cfg *
 func initLLMProviders(ctx context.Context, cfg *config.Config) providers.LLMClient {
 	// Initialize selected provider based on config
 	switch cfg.LLM.Provider {
+	case "mock":
+		slog.Info("Initializing Mock provider")
+		return mock.NewMockClient(ctx)
+
 	case "gemini":
 		if cfg.LLM.APIKey == "" {
 			slog.Error("Gemini provider selected but API key not provided")
