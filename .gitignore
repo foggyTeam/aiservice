@@ -30,3 +30,6 @@ coverage.txt
 *.log
 swag
 .qwen
+
+api_tests/fixtures/
+data.txt
