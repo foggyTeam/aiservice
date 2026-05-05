@@ -29,24 +29,18 @@ type TextPosition struct {
 	Height float32
 }
 
-// CalculateTextSize calculates the required size for a text element based on content
 func CalculateTextSize(content string) (width, height float32) {
-	// Estimate text dimensions
-	// Average character width: ~8px, line height: ~20px
 	charsPerLine := 50
 	lineHeight := float32(20.0)
 
-	// Calculate number of lines
 	numLines := int(math.Ceil(float64(len(content)) / float64(charsPerLine)))
 	if numLines < 1 {
 		numLines = 1
 	}
 
-	// Calculate width and height
 	width = float32(charsPerLine * 8)
 	height = float32(numLines) * lineHeight
 
-	// Add padding
 	width += 40
 	height += 20
 

@@ -3,21 +3,14 @@ package pipeline
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
-	"slices"
 	"strings"
-	"time"
 
-	"github.com/aiservice/internal/digitalink"
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/preprocessing"
 	"github.com/aiservice/internal/providers"
-	"github.com/aiservice/internal/services/cache"
 	"github.com/aiservice/internal/services/graph"
 	"github.com/aiservice/internal/services/image"
 	"github.com/aiservice/internal/utils"
@@ -25,11 +18,8 @@ import (
 	"github.com/firebase/genkit/go/core/x/session"
 )
 
-// Preprocessor for transforming raw data into structured formats
-var preprocessor = preprocessing.NewPreprocessor()
-
 // DigitalInkClient for recognizing handwriting
-var digitalInkClient = digitalink.NewClient("en", 0)
+var digitalInkClient providers.DigitalInkRecognizer
 
 // InkCache для кэширования результатов распознавания
 var inkCache = NewInkCache()
@@ -40,12 +30,6 @@ var graphPreprocessor = graph.NewGraphPreprocessor()
 // ImageService for downloading and cleaning up images
 var imageService *image.Service
 
-// CacheService for incremental analysis caching
-var cacheService *cache.AnalysisCacheService
-
-// Cropper for image cropping
-var cropper *image.ImageCropper
-
 // LLM client for incremental full rescan
 var llmForIncremental providers.LLMClient
 
@@ -54,19 +38,14 @@ func SetImageService(svc *image.Service) {
 	imageService = svc
 }
 
-// SetCacheService sets the cache service for the pipeline
-func SetCacheService(svc *cache.AnalysisCacheService) {
-	cacheService = svc
-}
-
-// SetCropper sets the cropper for the pipeline
-func SetCropper(c *image.ImageCropper) {
-	cropper = c
-}
-
 // SetLLMForIncremental sets the LLM client for incremental full rescan
 func SetLLMForIncremental(llm providers.LLMClient) {
 	llmForIncremental = llm
+}
+
+// SetDigitalInkClient sets the digital ink client for the pipeline
+func SetDigitalInkClient(client providers.DigitalInkRecognizer) {
+	digitalInkClient = client
 }
 
 func newImageDownloadStep() Step {
@@ -332,6 +311,7 @@ func newSummarizeStep(llm providers.LLMClient) Step {
 			state.SummarizeFlow = resp
 			return nil
 		}
+
 		history := sess.State().Messages
 		genkitHistory := models.ToGenkitMessages(history)
 
@@ -341,19 +321,22 @@ func newSummarizeStep(llm providers.LLMClient) Step {
 			return err
 		}
 
-		// Update Session
-		sessState := sess.State()
-		sessState.Messages = append(sessState.Messages,
-			models.MessageEntry{Role: "user", Content: userData},
-			models.MessageEntry{Role: "model", Content: resp.Summarization},
-		)
-		if err := sess.UpdateState(ctx, sessState); err != nil {
+		if err := updateSession(ctx, sess, sessionMsgs(userData, resp.Summarization), 6); err != nil {
 			slog.Warn("Failed to update session state", "err", err)
 		}
 
 		state.SummarizeFlow = resp
 		return nil
 	}
+}
+
+func updateSession(ctx context.Context, sess *session.Session[models.BoardSessionState], messages []models.MessageEntry, maxChatSize int) error {
+	sessState := sess.State()
+	sessState.Messages = models.ShiftAndAppendLimited(sessState.Messages, messages, maxChatSize)
+	if err := sess.UpdateState(ctx, sessState); err != nil {
+		return fmt.Errorf("failed to update session state: %w", err)
+	}
+	return nil
 }
 
 func newFillSummarizeResponseStep() Step {
@@ -429,27 +412,27 @@ func newStructurizeStep(llm providers.LLMClient) Step {
 			state.StructurizeFlow = resp
 			return nil
 		}
+
 		history := sess.State().Messages
 		genkitHistory := models.ToGenkitMessages(history)
-
-		// Call with history
 		resp, err := llm.StructurizeWithHistory(ctx, genkitHistory, parts)
 		if err != nil {
 			return err
 		}
 
-		// Update Session
-		sessState := sess.State()
-		sessState.Messages = append(sessState.Messages,
-			models.MessageEntry{Role: "user", Content: userData},
-			models.MessageEntry{Role: "model", Content: "Structurization completed"}, // Note: StructurizeFlow doesn't have text content like SummarizeFlow
-		)
-		if err := sess.UpdateState(ctx, sessState); err != nil {
+		if err := updateSession(ctx, sess, sessionMsgs(userData, resp.AiTreeResponse), 6); err != nil {
 			slog.Warn("Failed to update session state", "err", err)
 		}
 
 		state.StructurizeFlow = resp
 		return nil
+	}
+}
+
+func sessionMsgs(userData string, resp string) []models.MessageEntry {
+	return []models.MessageEntry{
+		{Role: "user", Content: userData},
+		{Role: "model", Content: resp},
 	}
 }
 
@@ -564,588 +547,5 @@ func fillStructRespWithMeta(flow providers.StructurizeFlow, state *PipelineState
 		RequestType:    models.StructurizeType,
 		AiTreeResponse: flow.AiTreeResponse,
 		File:           modelFile,
-	}
-}
-
-// newIncrementalFullRescanCheckStep handles the case when full rescan is needed
-func newIncrementalFullRescanCheckStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		req := state.AnalyzeRequest.IncrementalRequest
-
-		// If we have cache and don't need full rescan, continue with incremental
-		if state.IncrementalCache != nil && !req.IsFullRescan {
-			slog.Info("[Pipeline] Using cached analysis, continuing with incremental")
-			return nil
-		}
-
-		// No cache or full rescan requested - need to do full analysis first
-		slog.Info("[Pipeline] No cache or full rescan requested, performing full analysis first")
-
-		if req.FullBoard == nil {
-			return fmt.Errorf("full board data required for full rescan")
-		}
-
-		// Create a summarize request to do full analysis
-		summarizeReq := models.AnalyzeRequest{
-			RequestType: models.SummarizeType,
-			SummarizeRequest: models.SummarizeRequest{
-				RequestID:   req.RequestID,
-				UserID:      req.UserID,
-				RequestType: models.SummarizeType,
-				Board:       *req.FullBoard,
-			},
-		}
-
-		// Build and execute summarize pipeline
-		sumPipeline, err := BuildPipeline(models.SummarizeType, llmForIncremental, state.Provider)
-		if err != nil {
-			return fmt.Errorf("failed to build summarize pipeline: %w", err)
-		}
-
-		sumState := &PipelineState{
-			AnalyzeRequest: summarizeReq,
-			Provider:       state.Provider,
-		}
-
-		if err := sumPipeline.Execute(ctx, sumState); err != nil {
-			return fmt.Errorf("full analysis failed: %w", err)
-		}
-
-		// Create cache from full analysis result
-		regions := createRegionsFromElementsForPipeline(req.FullBoard.Elements)
-		boardSize := calculateBoardSize(req.FullBoard.Elements)
-
-		if cacheService != nil {
-			cacheService.UpdateCacheAfterFullScan(
-				req.BoardID,
-				sumState.SummarizeFlow.Summarization,
-				[]string{"board-analysis"},
-				regions,
-				req.FullBoard.Elements,
-				req.FullBoard.ImageURL,
-				boardSize,
-			)
-
-			// Get the cache we just created
-			cached, _ := cacheService.GetCache(req.BoardID)
-			state.IncrementalCache = cached
-		}
-
-		// Set incremental response from summarize result
-		state.IncrementalResponse = models.IncrementalAnalysisResponse{
-			RequestID:      req.RequestID,
-			UserID:         req.UserID,
-			RequestType:    models.IncrementalType,
-			GlobalSummary:  sumState.SummarizeFlow.Summarization,
-			KeyConcepts:    []string{"board-analysis"},
-			UpdatedRegions: []string{},
-			IsFullRescan:   true,
-		}
-
-		slog.Info("[Pipeline] Full rescan completed, returning result")
-
-		// Return special error to short-circuit remaining steps
-		return &ErrIncrementalFullRescan{Response: state.IncrementalResponse}
-	}
-}
-
-// ErrIncrementalFullRescan is returned when full rescan is performed
-type ErrIncrementalFullRescan struct {
-	Response models.IncrementalAnalysisResponse
-}
-
-func (e *ErrIncrementalFullRescan) Error() string {
-	return "full rescan performed"
-}
-
-// newIncrementalCacheCheckStep checks if we have cached analysis and if full rescan is needed
-func newIncrementalCacheCheckStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		slog.Info("[Pipeline] Incremental cache check started", "boardId", state.AnalyzeRequest.IncrementalRequest.BoardID)
-
-		req := state.AnalyzeRequest.IncrementalRequest
-
-		// Check if full rescan is requested
-		if req.IsFullRescan {
-			slog.Info("[Pipeline] Full rescan requested, skipping cache check")
-			return nil
-		}
-
-		// Try to get from cache
-		if cacheService == nil {
-			slog.Warn("[Pipeline] Cache service not set, skipping cache check")
-			return nil
-		}
-
-		cached, hasCache := cacheService.GetCache(req.BoardID)
-		if !hasCache {
-			slog.Info("[Pipeline] Cache miss, will perform full analysis", "boardId", req.BoardID)
-			return nil
-		}
-
-		// Check if cache needs full rescan
-		if cacheService.NeedsFullRescan(cached) {
-			slog.Info("[Pipeline] Cache needs full rescan", "boardId", req.BoardID)
-			return nil
-		}
-
-		state.IncrementalCache = cached
-		slog.Info("[Pipeline] Cache hit", "boardId", req.BoardID, "changeCount", cached.ChangeCount)
-
-		return nil
-	}
-}
-
-// newIncrementalChangeDetectionStep detects changes between cached and current elements
-func newIncrementalChangeDetectionStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		req := state.AnalyzeRequest.IncrementalRequest
-
-		// If no cache or full rescan, skip change detection
-		if state.IncrementalCache == nil || req.IsFullRescan {
-			slog.Info("[Pipeline] No cache or full rescan, skipping change detection")
-			return nil
-		}
-
-		if cacheService == nil {
-			slog.Warn("[Pipeline] Cache service not set, skipping change detection")
-			return nil
-		}
-
-		if req.FullBoard == nil {
-			return fmt.Errorf("full board data required for incremental analysis")
-		}
-
-		slog.Info("[Pipeline] Detecting changes", "boardId", req.BoardID)
-
-		// Detect changes
-		changes := cacheService.DetectChanges(
-			state.IncrementalCache.ElementHashes,
-			cacheService.CalculateElementHashes(req.FullBoard.Elements),
-			state.IncrementalCache.Elements,
-			req.FullBoard.Elements,
-		)
-
-		state.IncrementalChanges = changes
-		slog.Info("[Pipeline] Changes detected", "count", len(changes))
-
-		return nil
-	}
-}
-
-// newIncrementalNoChangesCheckStep checks if there are no changes and returns cached result
-func newIncrementalNoChangesCheckStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		// If no cache or full rescan, skip
-		if state.IncrementalCache == nil || state.AnalyzeRequest.IncrementalRequest.IsFullRescan {
-			return nil
-		}
-
-		// If no changes, return cached result
-		if len(state.IncrementalChanges) == 0 {
-			slog.Info("[Pipeline] No changes detected, returning cached result")
-
-			state.IncrementalResponse = models.IncrementalAnalysisResponse{
-				RequestID:      state.AnalyzeRequest.IncrementalRequest.RequestID,
-				UserID:         state.AnalyzeRequest.IncrementalRequest.UserID,
-				RequestType:    models.IncrementalType,
-				GlobalSummary:  state.IncrementalCache.GlobalSummary,
-				KeyConcepts:    state.IncrementalCache.KeyConcepts,
-				UpdatedRegions: []string{},
-				IsFullRescan:   false,
-			}
-
-			// Return special error to short-circuit pipeline
-			return &ErrIncrementalNoChanges{Response: state.IncrementalResponse}
-		}
-
-		return nil
-	}
-}
-
-// ErrIncrementalNoChanges is returned when no changes detected and cached result is returned
-type ErrIncrementalNoChanges struct {
-	Response models.IncrementalAnalysisResponse
-}
-
-func (e *ErrIncrementalNoChanges) Error() string {
-	return "no changes detected, returning cached result"
-}
-
-// newIncrementalRegionDetectionStep finds regions affected by changes
-func newIncrementalRegionDetectionStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		if state.IncrementalCache == nil {
-			slog.Info("[Pipeline] No cache, skipping region detection")
-			return nil
-		}
-
-		slog.Info("[Pipeline] Finding affected regions", "changeCount", len(state.IncrementalChanges))
-
-		affected := make(map[string]models.RegionSummary)
-
-		for _, region := range state.IncrementalCache.Regions {
-			for _, change := range state.IncrementalChanges {
-				if slices.Contains(region.ElementIDs, change.ElementID) {
-					affected[region.ID] = region
-					slog.Info("[Pipeline] Region affected", "regionID", region.ID, "elementID", change.ElementID)
-				}
-			}
-		}
-
-		result := make([]models.RegionSummary, 0, len(affected))
-		for _, region := range affected {
-			result = append(result, region)
-		}
-
-		state.IncrementalRegions = result
-		slog.Info("[Pipeline] Affected regions found", "count", len(result))
-
-		return nil
-	}
-}
-
-// newIncrementalImageDownloadStep downloads the board image
-func newIncrementalImageDownloadStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		req := state.AnalyzeRequest.IncrementalRequest
-
-		if req.FullBoard == nil || req.FullBoard.ImageURL == "" {
-			slog.Info("[Pipeline] No image URL, skipping download")
-			return nil
-		}
-
-		slog.Info("[Pipeline] Downloading image", "url", req.FullBoard.ImageURL)
-
-		httpClient := &http.Client{Timeout: 30 * time.Second}
-		resp, err := httpClient.Get(req.FullBoard.ImageURL)
-		if err != nil {
-			slog.Warn("[Pipeline] Failed to download image", "err", err)
-			return nil
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			slog.Warn("[Pipeline] Image download failed", "status", resp.StatusCode)
-			return nil
-		}
-
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			slog.Warn("[Pipeline] Failed to read image", "err", err)
-			return nil
-		}
-
-		state.IncrementalFullImage = data
-		slog.Info("[Pipeline] Image downloaded", "size", len(data))
-
-		return nil
-	}
-}
-
-// newIncrementalImageCropStep crops affected regions from the image
-func newIncrementalImageCropStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		if len(state.IncrementalFullImage) == 0 || len(state.IncrementalRegions) == 0 {
-			slog.Info("[Pipeline] No image or regions, skipping crop")
-			return nil
-		}
-
-		if cropper == nil {
-			slog.Warn("[Pipeline] Cropper not set, skipping crop")
-			return nil
-		}
-
-		slog.Info("[Pipeline] Cropping affected regions", "regionCount", len(state.IncrementalRegions))
-
-		req := state.AnalyzeRequest.IncrementalRequest
-		if req.FullBoard == nil {
-			return fmt.Errorf("full board data required")
-		}
-
-		var crops []string
-		var bboxes []models.BoundingBox
-
-		for _, region := range state.IncrementalRegions {
-			// Find elements in this region
-			var regionElements []models.Element
-			for _, elem := range req.FullBoard.Elements {
-				if slices.Contains(region.ElementIDs, elem.Id) {
-					regionElements = append(regionElements, elem)
-				}
-			}
-
-			// Crop with element-aware bounding box
-			croppedData, croppedBBox, err := cropper.CropWithElements(
-				state.IncrementalFullImage,
-				region.BBox,
-				regionElements,
-			)
-			if err != nil {
-				slog.Warn("[Pipeline] Failed to crop region", "regionID", region.ID, "err", err)
-				continue
-			}
-
-			crops = append(crops, cropper.ImageToBase64(croppedData))
-			bboxes = append(bboxes, croppedBBox)
-		}
-
-		state.IncrementalCrops = crops
-		state.IncrementalBBoxes = bboxes
-		slog.Info("[Pipeline] Cropping completed", "cropCount", len(crops))
-
-		return nil
-	}
-}
-
-// newIncrementalMergeCropsStep merges overlapping crops
-func newIncrementalMergeCropsStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		if cropper == nil || len(state.IncrementalBBoxes) == 0 {
-			return nil
-		}
-
-		slog.Info("[Pipeline] Merging overlapping crops", "count", len(state.IncrementalBBoxes))
-
-		merged := cropper.MergeOverlappingCrops(state.IncrementalBBoxes)
-
-		slog.Info("[Pipeline] Crops merged", "original", len(state.IncrementalBBoxes), "merged", len(merged))
-
-		state.IncrementalBBoxes = merged
-		return nil
-	}
-}
-
-// newIncrementalFallbackCheckStep checks if we should fallback to full scan
-func newIncrementalFallbackCheckStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		if cropper == nil || state.IncrementalCache == nil {
-			return nil
-		}
-
-		slog.Info("[Pipeline] Checking fallback condition")
-
-		if cropper.ShouldFallbackToFullScan(state.IncrementalBBoxes, state.IncrementalCache.BoardSize) {
-			slog.Info("[Pipeline] Fallback to full scan triggered")
-			return &ErrIncrementalFallback{Message: "crops cover too much area"}
-		}
-
-		slog.Info("[Pipeline] No fallback needed")
-		return nil
-	}
-}
-
-// ErrIncrementalFallback is returned when incremental analysis should fallback to full scan
-type ErrIncrementalFallback struct {
-	Message string
-}
-
-func (e *ErrIncrementalFallback) Error() string {
-	return e.Message
-}
-
-// newIncrementalPromptBuildStep builds the prompt for LLM
-func newIncrementalPromptBuildStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		slog.Info("[Pipeline] Building incremental prompt")
-		// Prompt will be built in LLM step with all context
-		return nil
-	}
-}
-
-// newIncrementalLLMAnalysisStep calls LLM for incremental analysis
-func newIncrementalLLMAnalysisStep(llm providers.LLMClient) Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		slog.Info("[Pipeline] Calling LLM for incremental analysis")
-
-		cached := state.IncrementalCache
-		if cached == nil {
-			return fmt.Errorf("cache is required for incremental analysis")
-		}
-
-		// Build text prompt
-		var prompt strings.Builder
-		prompt.WriteString("Ты анализируешь whiteboard.\n\n")
-		prompt.WriteString("Текущий анализ всей доски:\n")
-		prompt.WriteString(cached.GlobalSummary)
-		prompt.WriteString("\n\nКлючевые концепции: ")
-		prompt.WriteString(strings.Join(cached.KeyConcepts, ", "))
-		prompt.WriteString("\n\nПроизошли изменения:\n")
-
-		for _, change := range state.IncrementalChanges {
-			prompt.WriteString(fmt.Sprintf("- Элемент %s: %s\n", change.ElementID, change.ChangeType))
-		}
-
-		if len(state.IncrementalCrops) > 0 {
-			prompt.WriteString(fmt.Sprintf("\nИзмененные области: %d кропов изображений\n", len(state.IncrementalCrops)))
-		}
-
-		// Build parts for LLM
-		parts := []*ai.Part{ai.NewTextPart(prompt.String())}
-
-		// Add image crops
-		for _, cropBase64 := range state.IncrementalCrops {
-			parts = append(parts, ai.NewMediaPart("image/jpeg", "data:image/jpeg;base64,"+cropBase64))
-		}
-
-		// Add full board image if available
-		if len(state.IncrementalFullImage) > 0 && cropper != nil {
-			fullBase64 := cropper.ImageToBase64(state.IncrementalFullImage)
-			parts = append(parts, ai.NewMediaPart("image/jpeg", "data:image/jpeg;base64,"+fullBase64))
-		}
-
-		slog.Info("[Pipeline] LLM call with parts", "count", len(parts))
-
-		// Call LLM
-		response, err := llm.Summarize(ctx, parts)
-		if err != nil {
-			return fmt.Errorf("LLM analysis failed: %w", err)
-		}
-
-		slog.Info("[Pipeline] LLM response received", "length", len(response.Summarization))
-
-		// Try to parse as JSON
-		type LLMResponse struct {
-			GlobalSummary string   `json:"globalSummary"`
-			KeyConcepts   []string `json:"keyConcepts"`
-		}
-
-		var result LLMResponse
-		err = json.Unmarshal([]byte(response.Summarization), &result)
-		if err != nil {
-			slog.Warn("[Pipeline] Failed to parse LLM response as JSON, using as plain text", "err", err)
-			result.GlobalSummary = response.Summarization
-			result.KeyConcepts = cached.KeyConcepts
-		}
-
-		// Calculate new board size
-		req := state.AnalyzeRequest.IncrementalRequest
-		var newBoardSize models.BoundingBox
-		if req.FullBoard != nil {
-			newBoardSize = calculateBoardSize(req.FullBoard.Elements)
-		}
-
-		// Update cache
-		if cacheService != nil {
-			cacheService.UpdateCacheAfterIncremental(
-				cached,
-				result.GlobalSummary,
-				result.KeyConcepts,
-				affectedRegionIDs(state.IncrementalRegions),
-				req.FullBoard.Elements,
-				newBoardSize,
-			)
-		}
-
-		slog.Info("[Pipeline] Cache updated")
-
-		return nil
-	}
-}
-
-// calculateBoardSize calculates board size from elements
-func calculateBoardSize(elements []models.Element) models.BoundingBox {
-	if len(elements) == 0 {
-		return models.BoundingBox{W: 2000, H: 2000}
-	}
-
-	maxX, maxY := float32(0), float32(0)
-	for _, elem := range elements {
-		if elem.X+elem.Width > maxX {
-			maxX = elem.X + elem.Width
-		}
-		if elem.Y+elem.Height > maxY {
-			maxY = elem.Y + elem.Height
-		}
-	}
-
-	return models.BoundingBox{
-		X: 0,
-		Y: 0,
-		W: maxX + 100,
-		H: maxY + 100,
-	}
-}
-
-// affectedRegionIDs extracts region IDs
-func affectedRegionIDs(regions []models.RegionSummary) []string {
-	ids := make([]string, len(regions))
-	for i, region := range regions {
-		ids[i] = region.ID
-	}
-	return ids
-}
-
-// createRegionsFromElementsForPipeline creates regions from board elements (for pipeline use)
-func createRegionsFromElementsForPipeline(elements []models.Element) []models.RegionSummary {
-	boardSize := calculateBoardSize(elements)
-	gridW := boardSize.W / 3
-	gridH := boardSize.H / 3
-
-	regions := []models.RegionSummary{
-		{ID: "top-left", BBox: models.BoundingBox{X: 0, Y: 0, W: gridW, H: gridH}},
-		{ID: "top-center", BBox: models.BoundingBox{X: gridW, Y: 0, W: gridW, H: gridH}},
-		{ID: "top-right", BBox: models.BoundingBox{X: gridW * 2, Y: 0, W: gridW, H: gridH}},
-		{ID: "center-left", BBox: models.BoundingBox{X: 0, Y: gridH, W: gridW, H: gridH}},
-		{ID: "center", BBox: models.BoundingBox{X: gridW, Y: gridH, W: gridW, H: gridH}},
-		{ID: "center-right", BBox: models.BoundingBox{X: gridW * 2, Y: gridH, W: gridW, H: gridH}},
-		{ID: "bottom-left", BBox: models.BoundingBox{X: 0, Y: gridH * 2, W: gridW, H: gridH}},
-		{ID: "bottom-center", BBox: models.BoundingBox{X: gridW, Y: gridH * 2, W: gridW, H: gridH}},
-		{ID: "bottom-right", BBox: models.BoundingBox{X: gridW * 2, Y: gridH * 2, W: gridW, H: gridH}},
-	}
-
-	// Assign elements to regions
-	for i := range regions {
-		for _, elem := range elements {
-			elemBBox := models.BoundingBox{
-				X: elem.X,
-				Y: elem.Y,
-				W: elem.Width,
-				H: elem.Height,
-			}
-
-			if regions[i].BBox.Intersects(elemBBox) {
-				regions[i].ElementIDs = append(regions[i].ElementIDs, elem.Id)
-			}
-		}
-		regions[i].LastUpdated = time.Now()
-	}
-
-	return regions
-}
-
-// newIncrementalCacheUpdateStep updates cache after LLM analysis
-func newIncrementalCacheUpdateStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		// Cache is already updated in LLM step
-		return nil
-	}
-}
-
-// newIncrementalResponseStep fills the incremental response
-func newIncrementalResponseStep() Step {
-	return func(ctx context.Context, state *PipelineState) error {
-		req := state.AnalyzeRequest.IncrementalRequest
-		cached := state.IncrementalCache
-
-		if cached == nil {
-			// Full rescan case - response should be filled by full analysis
-			return nil
-		}
-
-		// Try to get response from LLM result
-		// Since we store in cache, we can get it from there
-		state.IncrementalResponse = models.IncrementalAnalysisResponse{
-			RequestID:      req.RequestID,
-			UserID:         req.UserID,
-			RequestType:    models.IncrementalType,
-			GlobalSummary:  cached.GlobalSummary,
-			KeyConcepts:    cached.KeyConcepts,
-			UpdatedRegions: affectedRegionIDs(state.IncrementalRegions),
-			IsFullRescan:   false,
-		}
-
-		slog.Info("[Pipeline] Incremental response filled")
-		return nil
 	}
 }

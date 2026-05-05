@@ -2,14 +2,11 @@ package handlers
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/aiservice/internal/models"
 	analysis "github.com/aiservice/internal/services/analysis"
 	jobservice "github.com/aiservice/internal/services/jobService"
-	"github.com/aiservice/internal/utils"
 	"github.com/labstack/echo/v4"
 )
 
@@ -50,6 +47,33 @@ func (h *AnalyzeHandler) GetJobStatus(c echo.Context) error {
 	return c.JSON(http.StatusOK, job)
 }
 
+// GetJobResponse returns the result of a completed job if it is available
+// @Summary Get job response
+// @Description Retrieve the response for a completed background job by ID
+// @Tags Jobs
+// @Accept json
+// @Produce json
+// @Param id path string true "Job ID"
+// @Success 200 {object} models.AnalyzeResponse
+// @Success 102 {string} string "Processing"
+// @Failure 404 {object} map[string]string
+// @Router /jobresponse/{id} [get]
+func (h *AnalyzeHandler) GetJobResponse(c echo.Context) error {
+	jobID := c.Param("id")
+	if _, err := h.service.GetJob(c.Request().Context(), jobID); err != nil {
+		return c.JSON(http.StatusNotFound, fmt.Errorf("failed to get job: %w", err))
+	}
+
+	resp, found, err := h.service.GetJobResponse(c.Request().Context(), jobID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to get job response: %w", err))
+	}
+	if !found {
+		return c.NoContent(http.StatusProcessing)
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
 // Abort aborts a specific job
 // @Summary Abort a job
 // @Description Abort a job by ID
@@ -81,47 +105,4 @@ func HealthHandler(c echo.Context) error {
 		"status": "ok",
 		"time":   time.Now().Format(time.RFC3339),
 	})
-}
-
-// SummarizeIncremental handles incremental summarization requests
-// @Summary Incremental board analysis
-// @Description Analyze board changes incrementally
-// @Tags Analysis
-// @Accept json
-// @Produce json
-// @Param request body models.IncrementalAnalysisRequest true "Incremental Analysis Request"
-// @Success 200 {object} models.IncrementalAnalysisResponse
-// @Success 202 {string} string "Job ID"
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /summarize/incremental [post]
-func (h *AnalyzeHandler) SummarizeIncremental(c echo.Context) error {
-	var req models.IncrementalAnalysisRequest
-
-	if err := c.Bind(&req); err != nil {
-		slog.Error("bind error:", "err", err)
-		return c.JSON(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
-	}
-
-	if req.BoardID == "" {
-		return c.JSON(http.StatusBadRequest, fmt.Errorf("boardId is required"))
-	}
-
-	// Set request type if not set
-	if req.RequestType == "" {
-		req.RequestType = models.IncrementalType
-	}
-
-	// Use standard job processing through pipeline
-	resp, err := h.service.StartJob(c.Request().Context(), models.NewIncrementalAnalyzeReq(req))
-	if err != nil {
-		if acceptedErr, ok := utils.MapErr[analysis.ErrAccepted](err); ok {
-			slog.Info("enqueue job:", "jobID", acceptedErr.JobID)
-			return c.JSON(http.StatusAccepted, acceptedErr.JobID)
-		}
-		slog.Error("incremental analysis failed:", "err", err)
-		return c.JSON(http.StatusInternalServerError, fmt.Errorf("analysis failed: %w", err))
-	}
-
-	return c.JSON(http.StatusOK, resp.IncrementalResponse)
 }

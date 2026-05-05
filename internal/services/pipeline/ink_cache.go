@@ -83,10 +83,7 @@ func (c *InkCache) cleanupExpired() {
 	}
 }
 
-// GenerateInkCacheKey генерирует ключ кэша из line элементов
-// Ключ основан на points элементов, поэтому одинаковые линии дают одинаковый ключ
 func GenerateInkCacheKey(lineElements []models.Element) string {
-	// Создаём упрощённое представление для хэширования
 	type point struct {
 		X float32 `json:"x"`
 		Y float32 `json:"y"`
@@ -102,7 +99,6 @@ func GenerateInkCacheKey(lineElements []models.Element) string {
 			continue
 		}
 
-		// Нормализуем points (группируем по парам x,y)
 		var points []point
 		for i := 0; i < len(elem.Points); i += 2 {
 			if i+1 < len(elem.Points) {
@@ -118,10 +114,8 @@ func GenerateInkCacheKey(lineElements []models.Element) string {
 		}
 	}
 
-	// Сериализуем и хэшируем
 	data, err := json.Marshal(signatures)
 	if err != nil {
-		// Fallback: простой хэш от длины
 		return fmt.Sprintf("ink_error_%d", len(signatures))
 	}
 

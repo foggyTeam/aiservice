@@ -109,14 +109,6 @@ GRAPH STRUCTURE формат:
 └── регламент
 `
 
-// Preprocessor transforms raw input data into structured formats for AI processing
-type Preprocessor struct{}
-
-// NewPreprocessor creates a new preprocessor instance
-func NewPreprocessor() *Preprocessor {
-	return &Preprocessor{}
-}
-
 // PreprocessGenerateTemplateRequest prepares data for template generation
 func PreprocessGenerateTemplateRequest(prompt string, boardType models.BoardType) []*ai.Part {
 	var userData strings.Builder

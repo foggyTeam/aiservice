@@ -1,12 +1,10 @@
 package jobservice
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
 	"time"
 
@@ -15,17 +13,21 @@ import (
 )
 
 const (
-	// JobCleanupAge defines how old a job must be before it's considered for cleanup (in hours)
+	// JobCleanupAge defines how old a job must be before it's considered for cleanup
 	JobCleanupAge = 24 * time.Hour
 )
 
 type JobQueueService struct {
-	queue       chan models.Job
-	oldJobQueue chan models.Job
-	wg          sync.WaitGroup
-	storage     JobStorage
-	request     Processor
+	queue              chan models.Job
+	oldJobQueue        chan models.Job
+	wg                 sync.WaitGroup
+	storage            JobStorage
+	request            Processor
+	completedResponses map[string]models.AnalyzeResponse
+	completedMu        sync.RWMutex
 }
+
+//go:generate mockgen -source=$GOFILE -destination=../mocks/mock_$GOFILE -package=mocks
 
 type JobStorage interface {
 	Save(job models.Job) error
@@ -52,10 +54,11 @@ func NewJob(req models.AnalyzeRequest) models.Job {
 
 func NewJobQueueService(bufSize, workers, dbWorkers int, storage JobStorage, p Processor) *JobQueueService {
 	q := &JobQueueService{
-		queue:       make(chan models.Job, bufSize),
-		oldJobQueue: make(chan models.Job, bufSize), // Initialize the oldJobQueue
-		storage:     storage,
-		request:     p,
+		queue:              make(chan models.Job, bufSize),
+		oldJobQueue:        make(chan models.Job, bufSize), // Initialize the oldJobQueue
+		storage:            storage,
+		request:            p,
+		completedResponses: make(map[string]models.AnalyzeResponse),
 	}
 	for range workers {
 		q.wg.Add(1)
@@ -122,7 +125,18 @@ func (q *JobQueueService) cleanJobs(jobs ...models.Job) error {
 			"inactive_job_ids", inactiveJobsIds,
 			"total_deleted", len(allJobIdsToDelete))
 
-		return q.storage.DeleteJobs(allJobIdsToDelete...)
+		if err := q.storage.DeleteJobs(allJobIdsToDelete...); err != nil {
+			return fmt.Errorf("failed to delete jobs: %w", err)
+		}
+		for _, id := range allJobIdsToDelete {
+			if err := q.deleteCompletedResponse(id); err != nil {
+				if errors.Is(err, completedResponseJobNotFoundErr) {
+					slog.Warn("completed job during clearing old jobs not found", "job_id", id)
+				}
+				return err
+			}
+			slog.Info("deleted job from completed-jobs storage", "job_id", id)
+		}
 	}
 
 	return nil
@@ -159,6 +173,34 @@ func (q *JobQueueService) Status(jobID string) (models.JobStatus, error) {
 	return job.Status, nil
 }
 
+func (q *JobQueueService) GetJobResponse(jobID string) (models.AnalyzeResponse, bool, error) {
+	q.completedMu.RLock()
+	resp, found := q.completedResponses[jobID]
+	q.completedMu.RUnlock()
+	if found {
+		return resp, true, nil
+	}
+	return models.AnalyzeResponse{}, false, nil
+}
+
+func (q *JobQueueService) storeCompletedResponse(jobID string, resp models.AnalyzeResponse) {
+	q.completedMu.Lock()
+	defer q.completedMu.Unlock()
+	q.completedResponses[jobID] = resp
+}
+
+var completedResponseJobNotFoundErr = fmt.Errorf("job not found in completed responses")
+
+func (q *JobQueueService) deleteCompletedResponse(jobID string) error {
+	q.completedMu.Lock()
+	defer q.completedMu.Unlock()
+	if _, found := q.completedResponses[jobID]; found {
+		delete(q.completedResponses, jobID)
+		return nil
+	}
+	return completedResponseJobNotFoundErr
+}
+
 func (q *JobQueueService) worker() {
 	defer q.wg.Done()
 	for job := range q.queue {
@@ -180,6 +222,11 @@ func (q *JobQueueService) processJob(job models.Job) {
 	currentJob, err := q.storage.Get(job.ID)
 	if err != nil {
 		slog.Error("failed to get job from storage", "id", job.ID, "err", err)
+		return
+	}
+
+	if currentJob.Status == models.JobStatusCompleted {
+		slog.Info("job already completed, skipping processing", "id", job.ID)
 		return
 	}
 
@@ -207,10 +254,6 @@ func (q *JobQueueService) processJob(job models.Job) {
 		if getStatusErr != nil || finalJob.Status != models.JobStatusAborted {
 			job.Status = models.JobStatusFailed
 			_ = q.storage.Update(job)
-			q.deliverCallback(job, map[string]any{
-				"status": "error",
-				"error":  err.Error(),
-			})
 		}
 		return
 	}
@@ -219,11 +262,11 @@ func (q *JobQueueService) processJob(job models.Job) {
 	finalJob, getStatusErr := q.storage.Get(job.ID)
 	if getStatusErr != nil || finalJob.Status != models.JobStatusAborted {
 		job.Status = models.JobStatusCompleted
-		_ = q.storage.Update(job)
-		q.deliverCallback(job, map[string]any{
-			"status": "success",
-			"result": resp,
-		})
+		if err := q.storage.Update(job); err != nil {
+			slog.Error("failed to update completed job status", "id", job.ID, "err", err)
+			return
+		}
+		q.storeCompletedResponse(job.ID, resp)
 	} else {
 		slog.Info("job was aborted during processing", "id", job.ID)
 	}
@@ -235,57 +278,9 @@ func (q *JobQueueService) Abort(ctx context.Context, jobID string) error {
 	return q.storage.Abort(ctx, jobID)
 }
 
-func (q *JobQueueService) deliverCallback(job models.Job, payload map[string]any) {
-	// Extract callback URL from the original request if it exists
-	callbackURL := q.extractCallbackURL(job.Request)
-	if callbackURL == "" {
-		// No callback URL provided, nothing to do
-		return
-	}
-
-	// Send the callback asynchronously to avoid blocking job processing
-	go q.sendCallbackRequest(job, callbackURL, payload)
-}
-
-func (q *JobQueueService) extractCallbackURL(req models.AnalyzeRequest) string {
-	return "" // Return empty for now since models don't include callback URL field
-}
-
-func (q *JobQueueService) sendCallbackRequest(job models.Job, callbackURL string, payload map[string]any) {
-	// Convert payload to JSON
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		slog.Error("failed to marshal callback payload", "job_id", job.ID, "err", err)
-		return
-	}
-
-	// Create HTTP request
-	httpClient := &http.Client{Timeout: 30 * time.Second} // Reasonable timeout for callbacks
-	req, err := http.NewRequestWithContext(context.Background(), "POST", callbackURL, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		slog.Error("failed to create callback request", "job_id", job.ID, "err", err)
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Callback-Type", "job-status-update")
-	req.Header.Set("X-Request-ID", job.ID)
-
-	// Send the request
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		slog.Error("failed to send callback request", "job_id", job.ID, "err", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Log the response
-	slog.Info("callback sent", "job_id", job.ID, "status_code", resp.StatusCode, "callback_url", callbackURL)
-}
-
 func (q *JobQueueService) Shutdown() {
 	close(q.queue)
-	close(q.oldJobQueue)  // Also close the old job queue
+	close(q.oldJobQueue) // Also close the old job queue
 	q.wg.Wait()
 }
 

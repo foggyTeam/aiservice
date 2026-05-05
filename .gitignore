@@ -32,4 +32,5 @@ swag
 .qwen
 
 api_tests/fixtures/
+api_tests/request_fixtures
 data.txt

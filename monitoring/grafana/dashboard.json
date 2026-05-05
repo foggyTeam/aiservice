@@ -1,0 +1,397 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "ai-service-monitoring",
+    "title": "AI Service Monitoring",
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "10s",
+    "style": "dark",
+    "tags": ["ai", "backend", "golang", "prometheus"],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "endpoint",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus",
+          "name": "Prometheus"
+          },
+          "refresh": 1,
+          "multi": true,
+          "includeAll": true,
+          "query": "label_values(ai_service_requests_total, endpoint)"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(ai_service_requests_total{endpoint=~\"$endpoint\"}[1m])) by (endpoint, status)",
+            "legendFormat": "{{endpoint}} {{status}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "min": 0
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 2,
+        "title": "p95 Latency",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(ai_service_request_duration_seconds_bucket{endpoint=~\"$endpoint\"}[5m])) by (le, endpoint))",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "min": 0
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 3,
+        "title": "Average Latency",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(ai_service_request_duration_seconds_sum{endpoint=~\"$endpoint\"}[5m])) by (endpoint) / sum(rate(ai_service_request_duration_seconds_count{endpoint=~\"$endpoint\"}[5m])) by (endpoint)",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "min": 0
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Rate",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(ai_service_requests_total{status=~\"5..\",endpoint=~\"$endpoint\"}[5m])) by (endpoint)",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "min": 0
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "go_memstats_alloc_bytes{job=\"aiservice-native\"}",
+            "legendFormat": "Allocated",
+            "refId": "A"
+          },
+          {
+            "expr": "go_memstats_heap_inuse_bytes{job=\"aiservice-native\"}",
+            "legendFormat": "Heap In Use",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 6,
+        "title": "Goroutines",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "go_goroutines{job=\"aiservice-native\"}",
+            "legendFormat": "goroutines",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 7,
+        "title": "CPU Usage",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=\"aiservice-native\"}[1m])",
+            "legendFormat": "cpu",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 8,
+        "title": "GC Pause Duration",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "rate(go_gc_duration_seconds_sum{job=\"aiservice-native\"}[5m])",
+            "legendFormat": "gc pause",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 9,
+        "title": "Total Requests",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 32,
+          "w": 6,
+          "h": 5
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "sum(ai_service_requests_total)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "horizontal",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Active Memory",
+        "type": "stat",
+        "gridPos": {
+          "x": 6,
+          "y": 32,
+          "w": 6,
+          "h": 5
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "go_memstats_heap_alloc_bytes{job=\"aiservice-native\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Uptime",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 32,
+          "w": 6,
+          "h": 5
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "process_uptime_seconds{job=\"aiservice-native\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Open File Descriptors",
+        "type": "stat",
+        "gridPos": {
+          "x": 18,
+          "y": 32,
+          "w": 6,
+          "h": 5
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus",
+          "name": "Prometheus",
+          "name": "Prometheus"
+        },
+        "targets": [
+          {
+            "expr": "process_open_fds{job=\"aiservice-native\"}",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

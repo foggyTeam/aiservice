@@ -29,12 +29,12 @@ type S3Config struct {
 }
 
 type LLMProviderConfig struct {
-	Provider     string // "ollama", "gemini", "yandex"
-	APIKey       string
-	BaseURL      string
-	TextModel    string // модель для суммаризации (текстовая)
-	VisionModel  string // модель для распознавания изображений
-	Timeout      time.Duration
+	Provider    string // "ollama", "gemini", "yandex"
+	APIKey      string
+	BaseURL     string
+	TextModel   string // модель для суммаризации (текстовая)
+	VisionModel string // модель для распознавания изображений
+	Timeout     time.Duration
 }
 
 type MultiProviderConfig struct {
@@ -121,8 +121,8 @@ func LoadFromEnv() *Config {
 		},
 		Job: JobConfig{
 			QueueSize:     getIntEnv("JOB_QUEUE_SIZE", 100),
-			WorkerCount:   getIntEnv("JOB_WORKERS", 2),
-			DbWorkerCount: getIntEnv("DB_JOB_WORKERS", 1),
+			WorkerCount:   getIntEnv("JOB_WORKERS", 10),
+			DbWorkerCount: getIntEnv("DB_JOB_WORKERS", 2),
 			MaxRetries:    getIntEnv("JOB_MAX_RETRIES", 3),
 			RetryBackoff:  getDurationEnv("JOB_RETRY_BACKOFF", 2*time.Second),
 		},

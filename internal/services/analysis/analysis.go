@@ -8,7 +8,6 @@ import (
 
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/providers"
-	"github.com/aiservice/internal/services/cache"
 	"github.com/aiservice/internal/services/image"
 	jobservice "github.com/aiservice/internal/services/jobService"
 	"github.com/aiservice/internal/services/pipeline"
@@ -25,49 +24,40 @@ func (e ErrAccepted) Error() string {
 }
 
 type AnalysisService struct {
-	llm          providers.LLMClient
-	timeout      time.Duration
-	jobQueue     *jobservice.JobQueueService
-	imageService *image.Service
-	cacheService *cache.AnalysisCacheService
-	cropper      *image.ImageCropper
-	sessionStore session.Store[models.BoardSessionState]
-	provider     string
+	llm              providers.LLMClient
+	digitalInkClient providers.DigitalInkRecognizer
+	timeout          time.Duration
+	jobQueue         *jobservice.JobQueueService
+	imageService     *image.Service
+	sessionStore     session.Store[models.BoardSessionState]
+	provider         string
 }
 
-func NewAnalysisService(timeout time.Duration, llm providers.LLMClient, jobQueue *jobservice.JobQueueService, imageService *image.Service, provider string) *AnalysisService {
+func NewAnalysisService(timeout time.Duration, llm providers.LLMClient, digitalInkClient providers.DigitalInkRecognizer, jobQueue *jobservice.JobQueueService, imageService *image.Service, provider string) *AnalysisService {
 	return &AnalysisService{
-		timeout:      timeout,
-		llm:          llm,
-		jobQueue:     jobQueue,
-		imageService: imageService,
-		provider:     provider,
+		timeout:          timeout,
+		llm:              llm,
+		digitalInkClient: digitalInkClient,
+		jobQueue:         jobQueue,
+		imageService:     imageService,
+		provider:         provider,
 	}
 }
 
 // Alternative constructor for when job queue is set later
-func NewAnalysisServiceWithoutJobQueue(timeout time.Duration, llm providers.LLMClient, imageService *image.Service, provider string) *AnalysisService {
+func NewAnalysisServiceWithoutJobQueue(timeout time.Duration, llm providers.LLMClient, digitalInkClient providers.DigitalInkRecognizer, imageService *image.Service, provider string) *AnalysisService {
 	return &AnalysisService{
-		timeout:      timeout,
-		llm:          llm,
-		imageService: imageService,
-		provider:     provider,
+		timeout:          timeout,
+		llm:              llm,
+		digitalInkClient: digitalInkClient,
+		imageService:     imageService,
+		provider:         provider,
 	}
 }
 
 // SetJobQueueService sets the job queue service
 func (s *AnalysisService) SetJobQueueService(jobQueueService *jobservice.JobQueueService) {
 	s.jobQueue = jobQueueService
-}
-
-// SetCacheService sets the cache service for incremental analysis
-func (s *AnalysisService) SetCacheService(cacheService *cache.AnalysisCacheService) {
-	s.cacheService = cacheService
-}
-
-// SetCropper sets the cropper for incremental analysis
-func (s *AnalysisService) SetCropper(cropper *image.ImageCropper) {
-	s.cropper = cropper
 }
 
 // SetSessionStore sets the session store for chat history
@@ -95,6 +85,16 @@ func (s *AnalysisService) GetJob(ctx context.Context, jobID string) (models.Job,
 		return models.Job{}, fmt.Errorf("job queue service not initialized")
 	}
 	return s.jobQueue.GetJob(ctx, jobID)
+}
+
+func (s *AnalysisService) GetJobResponse(ctx context.Context, jobID string) (models.AnalyzeResponse, bool, error) {
+	if s.jobQueue == nil {
+		return models.AnalyzeResponse{}, false, fmt.Errorf("job queue service not initialized")
+	}
+	if _, err := s.jobQueue.GetJob(ctx, jobID); err != nil {
+		return models.AnalyzeResponse{}, false, err
+	}
+	return s.jobQueue.GetJobResponse(jobID)
 }
 
 func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
@@ -137,9 +137,8 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
 	// Set services in pipeline
 	pipeline.SetImageService(s.imageService)
-	pipeline.SetCacheService(s.cacheService)
-	pipeline.SetCropper(s.cropper)
 	pipeline.SetLLMForIncremental(s.llm)
+	pipeline.SetDigitalInkClient(s.digitalInkClient)
 
 	// Handle Session for Summarize and Structurize
 	if (req.RequestType == models.SummarizeType || req.RequestType == models.StructurizeType) && s.sessionStore != nil {
@@ -162,18 +161,6 @@ func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest
 	}
 
 	if err := p.Execute(ctx, state); err != nil {
-		// Check for incremental no-changes shortcut
-		if noChangesErr, ok := utils.MapErr[*pipeline.ErrIncrementalNoChanges](err); ok {
-			slog.Info("Incremental analysis: no changes detected, returning cached result")
-			return models.AnalyzeResponse{IncrementalResponse: noChangesErr.Response}, nil
-		}
-
-		// Check for incremental full rescan shortcut
-		if fullRescanErr, ok := utils.MapErr[*pipeline.ErrIncrementalFullRescan](err); ok {
-			slog.Info("Incremental analysis: full rescan performed")
-			return models.AnalyzeResponse{IncrementalResponse: fullRescanErr.Response}, nil
-		}
-
 		return models.AnalyzeResponse{}, fmt.Errorf("processing pipeline failed: %w", err)
 	}
 
@@ -186,8 +173,6 @@ func (s *AnalysisService) extractBoardID(req models.AnalyzeRequest) string {
 		return req.SummarizeRequest.Board.BoardID
 	case models.StructurizeType:
 		return req.StructurizeRequest.Board.BoardID
-	case models.IncrementalType:
-		return req.IncrementalRequest.BoardID
 	default:
 		return ""
 	}

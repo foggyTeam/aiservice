@@ -26,3 +26,22 @@ func ToGenkitMessages(entries []MessageEntry) []*ai.Message {
 	}
 	return msgs
 }
+
+func ShiftAndAppendLimited(messages []MessageEntry, newMsgs []MessageEntry, maxSize int) []MessageEntry {
+	if maxSize <= 0 {
+		return []MessageEntry{}
+	}
+	if len(newMsgs) == 0 {
+		if len(messages) > maxSize {
+			return messages[len(messages)-maxSize:]
+		}
+		return messages
+	}
+	combined := make([]MessageEntry, 0, len(messages)+len(newMsgs))
+	combined = append(combined, messages...)
+	combined = append(combined, newMsgs...)
+	if len(combined) > maxSize {
+		combined = combined[len(combined)-maxSize:]
+	}
+	return combined
+}

@@ -45,14 +45,7 @@ func (s *Service) DownloadImage(ctx context.Context, imageURL string) (*Download
 
 	// Check if file already exists
 	if info, err := os.Stat(localPath); err == nil {
-		slog.Info("Image already exists, reusing", "path", localPath, "size", info.Size())
-		slog.Info("Image exists, NEED FIX SAME URL")
-
-		// return &DownloadResult{
-		// 	LocalPath: localPath,
-		// 	URL:       imageURL,
-		// 	Size:      info.Size(),
-		// }, nil
+		slog.Info("Image already exists, but will be overwritten", "path", localPath, "size", info.Size())
 	}
 
 	// Download the image

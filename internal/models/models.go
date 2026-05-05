@@ -1,7 +1,5 @@
 package models
 
-import "fmt"
-
 const (
 	SummarizeType        = "summarize"
 	StructurizeType      = "structurize"
@@ -26,33 +24,10 @@ const (
 	BoardTypeDOC    BoardType = "doc"
 )
 
-// type Rectangle struct {
-// 	BaseElement
-// 	CornerRadius int `json:"cornerRadius"`
-// }
-
 type Text struct {
 	BaseElement
 	Content string `json:"content" jsonschema:"description=Текстовое содержимое элемента"`
 }
-
-// type Ellipse struct {
-// 	BaseElement
-// }
-
-// type Line struct {
-// 	BaseElement
-// 	Points  []float32 `json:"points"`  // [x, y], [x, y]
-// 	Tension float32   `json:"tension"` // давление
-// }
-
-// type Elements struct {
-// 	Ellipse
-// 	Rectangle
-
-// 	Line
-// 	Text
-// }
 
 type BaseElement struct {
 	Id          string  `json:"id" jsonschema:"description=Уникальный идентификатор элемента"`
@@ -102,7 +77,6 @@ type AnalyzeRequest struct {
 	SummarizeRequest   SummarizeRequest
 	StructurizeRequest StructurizeRequest
 	TemplateRequest    GenerateTemplateRequest
-	IncrementalRequest IncrementalAnalysisRequest
 }
 
 func NewSumAnalyzeReq(req SummarizeRequest) AnalyzeRequest {
@@ -117,15 +91,10 @@ func NewTemplateAnalyzeReq(req GenerateTemplateRequest) AnalyzeRequest {
 	return AnalyzeRequest{RequestType: req.RequestType, TemplateRequest: req}
 }
 
-func NewIncrementalAnalyzeReq(req IncrementalAnalysisRequest) AnalyzeRequest {
-	return AnalyzeRequest{RequestType: IncrementalType, IncrementalRequest: req}
-}
-
 type AnalyzeResponse struct {
 	SummarizeResponse   SummarizeResponse
 	StructurizeResponse StructurizeResponse
 	TemplateResponse    GenerateTemplateResponse
-	IncrementalResponse IncrementalAnalysisResponse
 	TextResponse        TextResponse
 }
 
@@ -218,47 +187,6 @@ type GenerateTemplateRequest struct {
 	BoardID     string    `json:"boardId" jsonschema:"description=Уникальный идентификатор доски"`
 	Prompt      string    `json:"prompt" jsonschema:"description=Текстовый промпт для генерации шаблона"`
 	BoardType   BoardType `json:"boardType" jsonschema:"description=Тип доски: simple или graph"`
-}
-
-// Validate validates the generate template request
-func (r *GenerateTemplateRequest) Validate() error {
-	if r.RequestID == "" {
-		return fmt.Errorf("requestId is required")
-	}
-
-	if r.UserID == "" {
-		return fmt.Errorf("userId is required")
-	}
-
-	if r.RequestType != GenerateTemplateType && r.RequestType != GenerateTextType {
-		return fmt.Errorf("requestType must be 'generateTemplate'")
-	}
-
-	if r.BoardID == "" {
-		return fmt.Errorf("boardId is required")
-	}
-
-	if r.Prompt == "" {
-		return fmt.Errorf("prompt is required")
-	}
-
-	if len(r.Prompt) < 10 {
-		return fmt.Errorf("prompt must be at least 10 characters")
-	}
-
-	if len(r.Prompt) > 2000 {
-		return fmt.Errorf("prompt must be at most 2000 characters")
-	}
-
-	if r.BoardType == "" {
-		return fmt.Errorf("boardType is required")
-	}
-
-	if r.BoardType != BoardTypeSimple && r.BoardType != BoardTypeGraph && r.BoardType != BoardTypeDOC {
-		return fmt.Errorf("boardType must be 'simple', 'graph', or 'doc'")
-	}
-
-	return nil
 }
 
 // GenerateTemplateResponse represents the response from template generation

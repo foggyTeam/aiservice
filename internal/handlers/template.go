@@ -42,7 +42,7 @@ func (h *TemplateHandler) TemplateRequest(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, fmt.Errorf("failed to parse request: %w", err))
 	}
 	// Validate request
-	if err := req.Validate(); err != nil {
+	if err := validateTemplate(req); err != nil {
 		slog.Error("validation error:", "err", err)
 		return c.JSON(http.StatusBadRequest, fmt.Errorf("invalid request data: %w", err))
 	}
@@ -59,4 +59,36 @@ func (h *TemplateHandler) TemplateRequest(c echo.Context) error {
 		return c.JSON(http.StatusOK, resp.TextResponse)
 	}
 	return c.JSON(http.StatusOK, resp.TemplateResponse)
+}
+
+// Validate validates the generate template request
+func validateTemplate(r models.GenerateTemplateRequest) error {
+	if r.RequestID == "" {
+		return fmt.Errorf("requestId is required")
+	}
+	if r.UserID == "" {
+		return fmt.Errorf("userId is required")
+	}
+	if r.RequestType != models.GenerateTemplateType && r.RequestType != models.GenerateTextType {
+		return fmt.Errorf("requestType must be 'generateTemplate'")
+	}
+	if r.BoardID == "" {
+		return fmt.Errorf("boardId is required")
+	}
+	if r.Prompt == "" {
+		return fmt.Errorf("prompt is required")
+	}
+	if len(r.Prompt) < 10 {
+		return fmt.Errorf("prompt must be at least 10 characters")
+	}
+	if len(r.Prompt) > 2000 {
+		return fmt.Errorf("prompt must be at most 2000 characters")
+	}
+	if r.BoardType == "" {
+		return fmt.Errorf("boardType is required")
+	}
+	if r.BoardType != models.BoardTypeSimple && r.BoardType != models.BoardTypeGraph && r.BoardType != models.BoardTypeDOC {
+		return fmt.Errorf("boardType must be 'simple', 'graph', or 'doc'")
+	}
+	return nil
 }

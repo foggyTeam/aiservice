@@ -13,7 +13,7 @@ import (
 	"github.com/aiservice/internal/models"
 )
 
-const googleHandwritingEndpoint = "https://www.google.com.tw/inputtools/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8"
+var googleHandwritingEndpoint = "https://www.google.com.tw/inputtools/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8"
 
 // GoogleHandwritingRequest represents the request to Google Handwriting API
 type GoogleHandwritingRequest struct {

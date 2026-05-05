@@ -11,15 +11,12 @@ import (
 func APIKeyAuth(cfg *config.Config) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Skip auth in development environment
 			if cfg.Server.Env == "dev" {
 				return next(c)
 			}
 
-			// Get the API key from the header
 			apiKey := c.Request().Header.Get("x-api-key")
 			
-			// Check if the API key matches the expected verification key
 			expectedKey := cfg.Server.VerificationKey
 			
 			if apiKey != expectedKey {
@@ -28,7 +25,6 @@ func APIKeyAuth(cfg *config.Config) echo.MiddlewareFunc {
 				})
 			}
 
-			// API key is valid, continue with the request
 			return next(c)
 		}
 	}

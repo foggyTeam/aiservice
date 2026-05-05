@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,8 +16,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
 
-	"github.com/aiservice/internal/cache"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/aiservice/internal/config"
+	"github.com/aiservice/internal/digitalink"
 	"github.com/aiservice/internal/handlers"
 	"github.com/aiservice/internal/log"
 	authmiddleware "github.com/aiservice/internal/middleware"
@@ -26,7 +29,6 @@ import (
 	"github.com/aiservice/internal/providers/mock"
 	"github.com/aiservice/internal/providers/ollama"
 	"github.com/aiservice/internal/services/analysis"
-	servicecache "github.com/aiservice/internal/services/cache"
 	"github.com/aiservice/internal/services/database"
 	"github.com/aiservice/internal/services/image"
 	jobservice "github.com/aiservice/internal/services/jobService"
@@ -69,18 +71,8 @@ func main() {
 
 	llmClient := initLLMProviders(ctx, cfg)
 
-	// Initialize cache
-	appCache := cache.NewInMemoryCache()
-
-	// Wrap LLM client with caching if enabled (prod mode only)
-	var wrappedLLMClient providers.LLMClient
-	if cfg.Server.Env == "prod" {
-		wrappedLLMClient = cache.NewCachedLLMClient(llmClient, appCache)
-		slog.Info("LLM caching enabled (prod mode)", "ttl", "30m", "maxSize", "1GB")
-	} else {
-		wrappedLLMClient = llmClient
-		slog.Info("LLM caching disabled (dev mode)")
-	}
+	// Initialize DigitalInk client
+	digitalInkClient := initDigitalInkClient(cfg.LLM.Provider)
 
 	jobStorage, err := database.NewStorage(cfg.Database)
 	if err != nil {
@@ -96,14 +88,6 @@ func main() {
 		}
 	}()
 
-	// Wrap storage with caching if enabled
-	var wrappedStorage jobservice.JobStorage
-	if cfg.Server.Env == "prod" {
-		wrappedStorage = cache.NewCachedJobStorage(jobStorage, appCache)
-	} else {
-		wrappedStorage = jobStorage // Don't cache in dev to see fresh results
-	}
-
 	// Initialize image service
 	imageService := image.NewService(os.Getenv("IMAGES_DIR"), 5*time.Minute)
 
@@ -111,18 +95,11 @@ func main() {
 	imageService.StartCleaner(ctx, 5*time.Minute)
 
 	// Create the analysis service without the job queue initially
-	analysisService := analysis.NewAnalysisServiceWithoutJobQueue(cfg.Timeouts.SyncProcess, wrappedLLMClient, imageService, cfg.LLM.Provider)
-
-	// Initialize incremental analysis components
-	cacheService := servicecache.NewAnalysisCacheService(1*time.Hour, 10)
-	cropper := image.NewImageCropper()
+	analysisService := analysis.NewAnalysisServiceWithoutJobQueue(cfg.Timeouts.SyncProcess, llmClient, digitalInkClient, imageService, cfg.LLM.Provider)
 
 	// Initialize Session Store for chat history
 	chatStore := session.NewInMemoryStore[models.BoardSessionState]()
 
-	// Set cache service, cropper, and session store on analysis service
-	analysisService.SetCacheService(cacheService)
-	analysisService.SetCropper(cropper)
 	analysisService.SetSessionStore(chatStore)
 
 	// Create the job queue service with the analysis service as the processor
@@ -130,7 +107,7 @@ func main() {
 		cfg.Job.QueueSize,
 		cfg.Job.WorkerCount,
 		cfg.Job.DbWorkerCount,
-		wrappedStorage,
+		jobStorage,
 		analysisService, // analysisService implements the Processor interface
 	)
 
@@ -178,11 +155,26 @@ func main() {
 
 	e.GET("/health", handlers.HealthHandler)
 	e.GET("/jobs/:id", AnalyzeHandler.GetJobStatus)
+	e.GET("/jobresponse/:id", AnalyzeHandler.GetJobResponse)
 	e.PUT("/jobs/:id/abort", AnalyzeHandler.Abort)
 	e.POST("/summarize", AnalyzeHandler.Summarize)
 	e.POST("/structurize", AnalyzeHandler.Structurize)
 	e.POST("/template", TemplateHandler.TemplateRequest)
-	e.POST("/summarize/incremental", AnalyzeHandler.SummarizeIncremental)
+
+	pprofGroup := e.Group("/debug/pprof")
+	pprofGroup.GET("/", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	pprofGroup.GET("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
+	pprofGroup.GET("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	pprofGroup.GET("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	pprofGroup.GET("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	pprofGroup.GET("/allocs", echo.WrapHandler(http.HandlerFunc(pprof.Handler("allocs").ServeHTTP)))
+	pprofGroup.GET("/block", echo.WrapHandler(http.HandlerFunc(pprof.Handler("block").ServeHTTP)))
+	pprofGroup.GET("/goroutine", echo.WrapHandler(http.HandlerFunc(pprof.Handler("goroutine").ServeHTTP)))
+	pprofGroup.GET("/heap", echo.WrapHandler(http.HandlerFunc(pprof.Handler("heap").ServeHTTP)))
+	pprofGroup.GET("/mutex", echo.WrapHandler(http.HandlerFunc(pprof.Handler("mutex").ServeHTTP)))
+	pprofGroup.GET("/threadcreate", echo.WrapHandler(http.HandlerFunc(pprof.Handler("threadcreate").ServeHTTP)))
+
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	startServer(ctx, cancel, cfg, jobQueueService, e)
 }
@@ -249,4 +241,15 @@ func initOllama(ctx context.Context, cfg *config.Config) providers.LLMClient {
 		"vision_model", cfg.LLM.VisionModel,
 		"url", cfg.LLM.BaseURL)
 	return ollama.NewOllamaClient(ctx, cfg.LLM)
+}
+
+func initDigitalInkClient(provider string) providers.DigitalInkRecognizer {
+	switch provider {
+	case "mock":
+		slog.Info("Initializing Mock DigitalInk client")
+		return mock.NewMockDigitalInkClient()
+	default:
+		slog.Info("Initializing Real DigitalInk client")
+		return digitalink.NewRealDigitalInkClient("en", 30*time.Second)
+	}
 }

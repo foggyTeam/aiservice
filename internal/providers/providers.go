@@ -9,6 +9,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=./mocks/mock_$GOFILE -package=mocks
 type LLMClient interface {
 	ImageRecognition(ctx context.Context, parts []*ai.Part) (ImageRecognitionFlow, error)
 	Summarize(ctx context.Context, parts []*ai.Part) (SummarizeFlow, error)
@@ -18,6 +19,11 @@ type LLMClient interface {
 	GenerateTemplate(ctx context.Context, parts []*ai.Part) (TemplateGenerationFlow, error)
 	GenerateText(ctx context.Context, parts []*ai.Part) (string, error)
 	GetName() string // Added for provider identification
+}
+
+// DigitalInkRecognizer interface for handwriting recognition
+type DigitalInkRecognizer interface {
+	RecognizeInk(ctx context.Context, elements []models.Element) (string, error)
 }
 
 // ImageRecognitionFlow represents the output structure for image recognition
@@ -100,54 +106,32 @@ type FileHierarchy struct {
 
 // ToModelFile converts the flat FileHierarchy to the original recursive File model
 func (fh FileHierarchy) ToModelFile() models.File {
-	if len(fh.Nodes) == 0 {
+	if len(fh.RootIDs) == 0 {
 		return models.File{}
 	}
-
-	// Create a map of all nodes by ID for quick lookup
-	nodeMap := make(map[string]FileNode)
-	for _, node := range fh.Nodes {
-		nodeMap[node.ID] = node
-	}
-
-	// Create a map to store the model files we create
-	modelMap := make(map[string]models.File)
-
-	// First pass: create all model files without children
-	for id, node := range nodeMap {
-		modelMap[id] = models.File{
-			Name: node.Name,
-			Type: node.Type,
+	childrenByParent := map[string][]FileNode{}
+	nodeByID := map[string]FileNode{}
+	for _, n := range fh.Nodes {
+		nodeByID[n.ID] = n
+		if n.ParentID != nil {
+			childrenByParent[*n.ParentID] =
+				append(childrenByParent[*n.ParentID], n)
 		}
 	}
-
-	// Second pass: assign children to each parent
-	childrenMap := make(map[string][]models.File)
-	for id, node := range nodeMap {
-		if node.ParentID != nil {
-			// This node has a parent, add it as a child to the parent
-			parentID := *node.ParentID
-			childrenMap[parentID] = append(childrenMap[parentID], modelMap[id])
+	var build func(id string) models.File
+	build = func(id string) models.File {
+		n := nodeByID[id]
+		file := models.File{
+			Name: n.Name,
+			Type: n.Type,
 		}
-	}
-
-	// Assign children to parents
-	for parentID, children := range childrenMap {
-		if parentFile, exists := modelMap[parentID]; exists {
-			parentFile.Children = children
-			modelMap[parentID] = parentFile
+		for _, child := range childrenByParent[id] {
+			file.Children =
+				append(file.Children, build(child.ID))
 		}
+		return file
 	}
-
-	// Find the root node (the first one from rootIds that exists)
-	var rootNode models.File
-	if len(fh.RootIDs) > 0 {
-		if rootFile, exists := modelMap[fh.RootIDs[0]]; exists {
-			rootNode = rootFile
-		}
-	}
-
-	return rootNode
+	return build(fh.RootIDs[0])
 }
 
 type SimpleStructurizeFlow struct {

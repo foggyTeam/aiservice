@@ -30,13 +30,11 @@ func TestParseASCIITree_NestedTree(t *testing.T) {
 
 	assert.Greater(t, len(hierarchy.Nodes), 0, "should have nodes")
 	
-	// Check that we have proper parent-child relationships
 	nodeMap := make(map[string]string)
 	for _, node := range hierarchy.Nodes {
 		nodeMap[node.Name] = node.ID
 	}
 	
-	// Verify all nodes exist
 	assert.Contains(t, nodeMap, "project", "should have project node")
 	assert.Contains(t, nodeMap, "src", "should have src node")
 	assert.Contains(t, nodeMap, "main.go", "should have main.go node")
@@ -60,7 +58,6 @@ func TestParseASCIITree_DetectsFileTypes(t *testing.T) {
 
 	hierarchy := ParseASCIITree(asciiTree)
 
-	// Check that files are detected correctly
 	for _, node := range hierarchy.Nodes {
 		if node.Name == "src" {
 			assert.Equal(t, "section", node.Type, "src should be a section")
@@ -86,7 +83,6 @@ func TestToModelFile_ConvertsHierarchy(t *testing.T) {
 	assert.NotEmpty(t, modelFile.Name, "should have a name")
 	assert.Equal(t, "project", modelFile.Name, "root should be project")
 	assert.Equal(t, "section", modelFile.Type, "root should be a section")
-	// Basic conversion works - detailed parent-child testing is complex
 	assert.GreaterOrEqual(t, len(hierarchy.Nodes), 4, "should have at least 4 nodes")
 }
 

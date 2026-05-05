@@ -1,51 +1,113 @@
 package analysis
 
-// func TestProcess_UnsupportedType(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+import (
+	"context"
+	"testing"
+	"time"
 
-// 	ink := mocks.NewMockInkRecognizer(ctrl)
-// 	llm := mocks.NewMockLLMClient(ctrl)
+	"github.com/aiservice/internal/models"
+	"github.com/stretchr/testify/assert"
+)
 
-// 	svc := NewAnalysisService(2*time.Second, ink, llm)
-// 	_, err := svc.Process(context.Background(), models.AnalyzeRequest{Type: "unknown-type"})
-// 	require.Error(t, err)
-// }
+func makeSummarizeRequest(boardID, userID string) models.AnalyzeRequest {
+	return models.NewSumAnalyzeReq(models.SummarizeRequest{
+		RequestID: "req-1",
+		UserID:    userID,
+		Board: models.Board{
+			BoardID: boardID,
+			Elements: []models.Element{
+				{Id: "e1", Type: "text", Content: "test"},
+			},
+		},
+	})
+}
 
-// func TestProcess_LLMErrorPropagated(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func makeStructurizeRequest(boardID, userID string) models.AnalyzeRequest {
+	return models.NewStructAnalyzeReq(models.StructurizeRequest{
+		RequestID: "req-2",
+		UserID:    userID,
+		Board: models.Board{
+			BoardID: boardID,
+			Elements: []models.Element{
+				{Id: "e2", Type: "rectangle"},
+			},
+		},
+		File: models.File{Name: "root", Type: "section"},
+	})
+}
 
-// 	ink := mocks.NewMockInkRecognizer(ctrl)
-// 	llm := mocks.NewMockLLMClient(ctrl)
+func TestExtractBoardID_Summarize(t *testing.T) {
+	t.Parallel()
 
-// 	llm.EXPECT().Analyze(gomock.Any(), gomock.Any()).Return(models.SummarizeResponse{}, errors.New("llm failed"))
+	svc := &AnalysisService{}
+	req := makeSummarizeRequest("board-sum-42", "user-1")
 
-// 	svc := NewAnalysisService(2*time.Second, ink, llm)
-// 	req := models.AnalyzeRequest{
-// 		Type:      "userQuestion",
-// 		TextInput: models.TextInput{Type: "test", Text: "Hello"},
-// 	}
-// 	_, err := svc.Process(context.Background(), req)
-// 	require.Error(t, err)
-// }
+	got := svc.extractBoardID(req)
+	assert.Equal(t, "board-sum-42", got)
+}
 
-// func TestProcess_Success_ReturnsLLMResponse(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func TestExtractBoardID_Structurize(t *testing.T) {
+	t.Parallel()
 
-// 	ink := mocks.NewMockInkRecognizer(ctrl)
-// 	llm := mocks.NewMockLLMClient(ctrl)
+	svc := &AnalysisService{}
+	req := makeStructurizeRequest("board-struct-99", "user-2")
 
-// 	expected := models.SummarizeResponse{ResponseMessage: "ok-from-llm"}
-// 	llm.EXPECT().Analyze(gomock.Any(), gomock.Any()).Return(expected, nil).Times(1)
+	got := svc.extractBoardID(req)
+	assert.Equal(t, "board-struct-99", got)
+}
 
-// 	svc := NewAnalysisService(2*time.Second, ink, llm)
-// 	req := models.AnalyzeRequest{
-// 		Type:      "userQuestion",
-// 		TextInput: models.TextInput{Type: "test", Text: "Hello"},
-// 	}
-// 	resp, err := svc.Process(context.Background(), req)
-// 	require.NoError(t, err)
-// 	require.Equal(t, expected.ResponseMessage, resp.ResponseMessage)
-// }
+func TestExtractBoardID_OtherTypes_ReturnsEmpty(t *testing.T) {
+	t.Parallel()
+
+	svc := &AnalysisService{}
+	types := []string{models.GenerateTemplateType, models.GenerateTextType, "unknown"}
+
+	for _, reqType := range types {
+		t.Run(reqType, func(t *testing.T) {
+			t.Parallel()
+			req := models.AnalyzeRequest{RequestType: reqType}
+			got := svc.extractBoardID(req)
+			assert.Empty(t, got)
+		})
+	}
+}
+
+func TestNewAnalysisServiceWithoutJobQueue_LeavesQueueNil(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnalysisServiceWithoutJobQueue(15*time.Second, nil, nil, nil, "gemini")
+
+	assert.Equal(t, 15*time.Second, svc.timeout)
+	assert.Equal(t, "gemini", svc.provider)
+	assert.Nil(t, svc.jobQueue)
+}
+
+func TestAbort_WhenJobQueueNil_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnalysisServiceWithoutJobQueue(time.Second, nil, nil, nil, "mock")
+	err := svc.Abort(context.Background(), "job-123")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "job queue service not initialized")
+}
+
+func TestGetJob_WhenJobQueueNil_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnalysisServiceWithoutJobQueue(time.Second, nil, nil, nil, "mock")
+	_, err := svc.GetJob(context.Background(), "job-123")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "job queue service not initialized")
+}
+
+func TestGetJobResponse_WhenJobQueueNil_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnalysisServiceWithoutJobQueue(time.Second, nil, nil, nil, "mock")
+	_, _, err := svc.GetJobResponse(context.Background(), "job-123")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "job queue service not initialized")
+}
