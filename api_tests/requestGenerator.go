@@ -401,17 +401,17 @@ func runRequestGenerator() {
 	}
 
 	generators := []func() error{
-		generator(gen.GenerateSummarize, LightConfig(), 10, "summarize_light"),
-		generator(gen.GenerateStructurize, LightConfig(), 10, "structurize_light"),
-		generator(gen.GenerateTemplate, LightConfig(), 10, "template_light"),
+		// generator(gen.GenerateSummarize, LightConfig(), 10, "summarize_light"),
+		// generator(gen.GenerateStructurize, LightConfig(), 10, "structurize_light"),
+		// generator(gen.GenerateTemplate, LightConfig(), 10, "template_light"),
 
-		generator(gen.GenerateSummarize, DefaultConfig(), 5, "summarize_default"),
-		generator(gen.GenerateStructurize, DefaultConfig(), 5, "structurize_default"),
-		generator(gen.GenerateTemplate, DefaultConfig(), 5, "template_default"),
+		// generator(gen.GenerateSummarize, DefaultConfig(), 5, "summarize_default"),
+		// generator(gen.GenerateStructurize, DefaultConfig(), 5, "structurize_default"),
+		// generator(gen.GenerateTemplate, DefaultConfig(), 5, "template_default"),
 
-		generator(gen.GenerateSummarize, HeavyConfig(), 3, "summarize_heavy"),
-		generator(gen.GenerateStructurize, HeavyConfig(), 3, "structurize_heavy"),
-		generator(gen.GenerateTemplate, HeavyConfig(), 3, "template_heavy"),
+		generator(gen.GenerateSummarize, HeavyConfig(), 200, "summarize_heavy"),
+		generator(gen.GenerateStructurize, HeavyConfig(), 200, "structurize_heavy"),
+		generator(gen.GenerateTemplate, HeavyConfig(), 200, "template_heavy"),
 	}
 
 	for _, generator := range generators {
