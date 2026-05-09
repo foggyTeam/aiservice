@@ -1,13 +1,19 @@
 package preprocessing
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/aiservice/internal/models"
+	"github.com/google/uuid"
 )
 
 func TestCreateFileHierarchyDescription(t *testing.T) {
+	uuid0 := uuid.New().String()
+	uuid1 := uuid.New().String()
+	uuid2 := uuid.New().String()
+	uuid3 := uuid.New().String()
 	tests := []struct {
 		name     string
 		file     models.File
@@ -21,24 +27,29 @@ func TestCreateFileHierarchyDescription(t *testing.T) {
 		{
 			name: "file without children",
 			file: models.File{
-				Name: "test.txt",
+				Name: "test",
 				Type: "doc",
+				Id:   uuid0,
 			},
-			expected: "test.txt\n",
+			expected: fmt.Sprintf("%s.%s.%s", "test", uuid0, "doc") + "\n",
 		},
 		{
 			name: "file with children",
 			file: models.File{
 				Name: "root",
 				Type: "section",
+				Id:   uuid0,
 				Children: []models.File{
-					{Name: "child1.txt", Type: "doc"},
-					{Name: "child2", Type: "section", Children: []models.File{
-						{Name: "grandchild.txt", Type: "doc"},
+					{Name: "child1", Type: "simple", Id: uuid1},
+					{Name: "child2", Type: "section", Id: uuid2, Children: []models.File{
+						{Name: "grandchild", Type: "graph", Id: uuid3},
 					}},
 				},
 			},
-			expected: "root\n├── child1.txt\n└── child2\n    └── grandchild.txt\n",
+			expected: fmt.Sprintf("%s.%s.%s", "root", uuid0, "section") +
+				"\n├── " + fmt.Sprintf("%s.%s.%s", "child1", uuid1, "simple") +
+				"\n└── " + fmt.Sprintf("%s.%s.%s", "child2", uuid2, "section") +
+				"\n    └── " + fmt.Sprintf("%s.%s.%s", "grandchild", uuid3, "graph") + "\n",
 		},
 	}
 
@@ -53,6 +64,8 @@ func TestCreateFileHierarchyDescription(t *testing.T) {
 }
 
 func TestWriteFileTree(t *testing.T) {
+	uuid0 := uuid.New().String()
+	uuid1 := uuid.New().String()
 	tests := []struct {
 		name     string
 		files    []models.File
@@ -68,37 +81,37 @@ func TestWriteFileTree(t *testing.T) {
 		{
 			name: "single file",
 			files: []models.File{
-				{Name: "file.txt", Type: "doc"},
+				{Name: "file.txt", Type: "doc", Id: uuid0},
 			},
 			prefix:   "",
-			expected: "└── file.txt\n",
+			expected: "└── " + fmt.Sprintf("%s.%s.%s", "file.txt", uuid0, "doc") + "\n",
 		},
 		{
 			name: "multiple files",
 			files: []models.File{
-				{Name: "file1.txt", Type: "doc"},
-				{Name: "file2.txt", Type: "doc"},
+				{Name: "file1", Type: "doc", Id: uuid0},
+				{Name: "file2", Type: "graph", Id: uuid1},
 			},
 			prefix:   "",
-			expected: "├── file1.txt\n└── file2.txt\n",
+			expected: "├── " + fmt.Sprintf("%s.%s.%s", "file1", uuid0, "doc") + "\n└── " + fmt.Sprintf("%s.%s.%s", "file2", uuid1, "graph") + "\n",
 		},
 		{
 			name: "nested files",
 			files: []models.File{
-				{Name: "dir", Type: "section", Children: []models.File{
-					{Name: "nested.txt", Type: "doc"},
+				{Name: "dir", Type: "section", Id: uuid0, Children: []models.File{
+					{Name: "nested", Type: "doc", Id: uuid1},
 				}},
 			},
 			prefix:   "",
-			expected: "└── dir\n    └── nested.txt\n",
+			expected: "└── " + fmt.Sprintf("%s.%s.%s", "dir", uuid0, "section") + "\n    └── " + fmt.Sprintf("%s.%s.%s", "nested", uuid1, "doc") + "\n",
 		},
 		{
 			name: "with prefix",
 			files: []models.File{
-				{Name: "file.txt", Type: "doc"},
+				{Name: "file", Type: "doc", Id: uuid0},
 			},
 			prefix:   "│   ",
-			expected: "│   └── file.txt\n",
+			expected: "│   └── " + fmt.Sprintf("%s.%s.%s", "file", uuid0, "doc") + "\n",
 		},
 	}
 

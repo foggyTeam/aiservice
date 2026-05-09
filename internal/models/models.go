@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 const (
 	SummarizeType        = "summarize"
 	StructurizeType      = "structurize"
@@ -137,8 +139,13 @@ type StructurizeResponse struct {
 
 type File struct {
 	Name     string `json:"name" jsonschema:"description=Имя файла или папки"`
-	Type     string `json:"type" jsonschema:"description=Тип: doc (файл), section (папка)"`
+	Type     string `json:"type" jsonschema:"description=Тип: doc (текстовый формат доски), section (папка), graph (графовый формат доски), simple (простая доска)"`
+	Id       string `json:"id" jsonschema:"description=Уникальный идентификатор файла"`
 	Children []File `json:"children" jsonschema:"description=Дочерние элементы (для папок)"`
+}
+
+func (f File) String() string {
+	return fmt.Sprintf("%s.%s.%s", f.Name, f.Id, f.Type)
 }
 
 func (f File) IsEmpty() bool {

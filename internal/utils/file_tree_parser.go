@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log/slog"
 	"strings"
 
 	"github.com/aiservice/internal/models"
@@ -43,13 +44,14 @@ func (p *FileTreeParser) parseLines(lines []string) {
 			continue
 		}
 
-		nodeType := p.determineNodeType(name)
+		boardName, id, boardType := p.determineNodeType(name)
 		nodeID := generateNodeID(len(p.nodes))
 
 		node := providers.FileNode{
-			ID:   nodeID,
-			Name: name,
-			Type: nodeType,
+			ID:     nodeID,
+			RealID: id,
+			Name:   boardName,
+			Type:   boardType,
 		}
 
 		for len(stack) > 0 && stack[len(stack)-1].position >= position {
@@ -102,31 +104,26 @@ func (p *FileTreeParser) parseLine(line string) (position int, name string) {
 	return lastConnector, name
 }
 
-func (p *FileTreeParser) determineNodeType(name string) string {
-	fileExtensions := []string{
-		".go", ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".hpp",
-		".rb", ".rs", ".php", ".swift", ".kt", ".scala", ".cs",
-		".md", ".txt", ".rst", ".adoc",
-		".json", ".yaml", ".yml", ".toml", ".xml",
-		".html", ".css", ".scss", ".less",
-		".sh", ".bash", ".zsh", ".fish",
-		".dockerfile", ".gitignore", ".env",
-		".pdf", ".doc", ".docx", ".xls", ".xlsx",
-		".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
-		".mp3", ".mp4", ".avi", ".mov",
-		".zip", ".tar", ".gz", ".rar", ".7z",
+func (p *FileTreeParser) determineNodeType(name string) (boardName string, id string, boardType string) {
+	parts := strings.Split(name, ".")
+	switch len(parts) {
+	case 0:
+		slog.Warn("invalid tree parsing:", "got", name)
+		return "", "", ""
+	case 1:
+		slog.Warn("invalid tree parsing:", "got", name)
+		return name, "", ""
+	case 2:
+		boardName := parts[0]
+		boardType := parts[1]
+		return boardName, "", boardType
+	case 3:
+		boardName := parts[0]
+		id := parts[1]
+		boardType := parts[2]
+		return boardName, id, boardType
 	}
-
-	nameLower := strings.ToLower(name)
-	for _, ext := range fileExtensions {
-		if strings.HasSuffix(nameLower, ext) {
-			return "doc"
-		}
-	}
-	if strings.Contains(name, ".") {
-		return "doc"
-	}
-	return "section"
+	return "", "", ""
 }
 
 func generateNodeID(index int) string {
@@ -159,6 +156,7 @@ func ToModelFile(h providers.FileHierarchy) models.File {
 		file := models.File{
 			Name: node.Name,
 			Type: node.Type,
+			Id:   node.RealID,
 		}
 		for _, childID := range childrenMap[id] {
 			file.Children = append(file.Children, build(childID))

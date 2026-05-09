@@ -50,13 +50,13 @@ func BuildPipeline(t string, llm providers.LLMClient, provider string) (*Pipelin
 	switch t {
 	case models.SummarizeType:
 		return NewPipeline(
-			newImageDownloadStep(),
-			newDigitalInkAnalysisStep(),
-			newBoardTextExtractionStep(),
-			newGraphPreprocessingStep(),
-			newImageRecognitionStep(llm),
-			newSummarizeStep(llm),
-			newFillSummarizeResponseStep(),
+			newImageDownloadStep(),         // скачивание изображения
+			newDigitalInkAnalysisStep(),    // анализ цифровых чернил
+			newBoardTextExtractionStep(),   // извлечение текста с доски
+			newGraphPreprocessingStep(),    // предварительная обработка для графа
+			newImageRecognitionStep(llm),   // распознавание объектов на изображении с помощью LLM
+			newSummarizeStep(llm),          // этап суммаризации с помощью LLM
+			newFillSummarizeResponseStep(), // заполнение ответа для суммаризации
 		), nil
 	case models.StructurizeType:
 		return NewPipeline(

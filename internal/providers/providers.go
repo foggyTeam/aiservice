@@ -2,11 +2,9 @@ package providers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aiservice/internal/models"
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/genkit"
 )
 
 //go:generate mockgen -source=$GOFILE -destination=./mocks/mock_$GOFILE -package=mocks
@@ -76,6 +74,13 @@ type TemplateNode struct {
 	Title       string `json:"title" jsonschema:"description=Заголовок узла"`
 	Description string `json:"description,omitempty" jsonschema:"description=Описание узла"`
 	URL         string `json:"url,omitempty" jsonschema:"description=URL для внешних ссылок"`
+
+	// Новые поля
+	X     float32 `json:"x,omitempty" jsonschema:"description=Координата X центра узла"`
+	Y     float32 `json:"y,omitempty" jsonschema:"description=Координата Y центра узла"`
+	Color string  `json:"color,omitempty" jsonschema:"description=Цвет узла в формате hex"`
+	Shape string  `json:"shape,omitempty" jsonschema:"description=Форма узла: circle, rect, diamond, triangle, pentagon"`
+	Align string  `json:"align,omitempty" jsonschema:"description=Выравнивание текста внутри узла: start, center, end"`
 }
 
 // TemplateEdge represents a graph edge for graph board (simplified - connections only)
@@ -93,6 +98,7 @@ type TemplateEdge struct {
 // This avoids infinite recursion during JSON schema generation
 type FileNode struct {
 	ID       string  `json:"id"`
+	RealID   string  `json:"realId,omitempty"` // Optional field to store the original ID for testing purposes
 	Name     string  `json:"name" example:"main.go"`
 	Type     string  `json:"type" example:"doc"` //doc, simple, graph,(поле children пустое) | section (содердит детей)
 	ParentID *string `json:"parentId,omitempty"` // Points to parent node ID, nil for root
@@ -132,43 +138,6 @@ func (fh FileHierarchy) ToModelFile() models.File {
 		return file
 	}
 	return build(fh.RootIDs[0])
-}
-
-type SimpleStructurizeFlow struct {
-	Prompt         string        `json:"userPrompt"`
-	Answer         string        `json:"answer"`
-	AiTreeResponse string        `json:"aiTreeResponse"`
-	File           FileHierarchy `json:"children"`
-}
-
-func RunStructurizeGeneration(ctx context.Context, gkit *genkit.Genkit, parts []*ai.Part) (*SimpleStructurizeFlow, error) {
-	prompt := ai.NewUserMessage(parts...)
-	resp, err := genkit.Generate(ctx, gkit,
-		ai.WithMessages(prompt),
-		ai.WithOutputType(&SimpleStructurizeFlow{}),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate llm request: %w", err)
-	}
-
-	var flow SimpleStructurizeFlow
-	if err := resp.Output(&flow); err != nil {
-		return nil, fmt.Errorf("failed to parse output: %w", err)
-	}
-	return &flow, nil
-}
-
-// RunStructurizeGenerationAndConvert executes the structurize generation and converts the result to the original File model
-func RunStructurizeGenerationAndConvert(ctx context.Context, gkit *genkit.Genkit, parts []*ai.Part) (models.File, string, error) {
-	resp, err := RunStructurizeGeneration(ctx, gkit, parts)
-	if err != nil {
-		return models.File{}, "", fmt.Errorf("failed to generate llm request: %w", err)
-	}
-
-	// Convert the flat hierarchy to the original recursive File model
-	modelFile := resp.File.ToModelFile()
-
-	return modelFile, resp.AiTreeResponse, nil
 }
 
 // StructurizeFlow represents the output structure for structurization (used in pipeline)

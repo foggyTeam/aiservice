@@ -19,3 +19,5 @@ go test \
   ./internal/services/pipeline/... \
   ./internal/services/storage/... 
 
+
+go tool cover -func=coverage.out | echo "TEST COVERAGE: $(tail -1 | awk '{print $3}')"

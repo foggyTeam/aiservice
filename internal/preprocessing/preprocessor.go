@@ -101,12 +101,26 @@ GRAPH STRUCTURE формат:
 1) Проанализируй всё предоставленное описание
 2) Создай файловую структуру проекта на основе содержимого доски и предоставленной иерархии (если есть)
 
-Мне нужно, чтобы ты предоставил ответ в формате ASCII TREE дерева. Вот пример:
-задачи
-├── процессы
-│   ├── тестовое задание
-│   └── договор
-└── регламент
+Файловая структура - это структуру проекта, которая состоит из папок и файлов.
+Файлы - это элементы типа "doc", "simple", "graph".
+Папки - это элементы типа "section". Папки могут содержать файлы и другие папки.
+
+Если в предоставленной иерархии уже есть файлы и папки, то тебе нужно их использовать и дополнить новыми элементами на основе содержимого доски.
+Для новых элементов не создавай идентификатор. Пропусти его, например: новый файл на основе доски.doc
+Пример предоставленной иерархии:
+задачи.81e076aa-965d-4475-9c46-b2be5bb1e2e0.section
+├── процессы.81e076aa-965d-4475-9c46-b2be5bb1e2e0.section
+│   ├── тестовое задание.81e076aa-965d-4475-9c46-b2be5bb1e2e0.graph
+│   └── договор.81e076aa-965d-4475-9c46-b2be5bb1e2e0.doc
+└── регламент.81e076aa-965d-4475-9c46-b2be5bb1e2e0.simple
+
+Пример новой иерархии, которую нужно создать на основе предоставленной иерархии и содержимого доски в ASCIITree формате:
+задачи.81e076aa-965d-4475-9c46-b2be5bb1e2e0.section
+├── процессы.81e076aa-965d-4475-9c46-b2be5bb1e2e0.section
+│   ├── тестовое задание.81e076aa-965d-4475-9c46-b2be5bb1e2e0.graph
+│   ├── договор.81e076aa-965d-4475-9c46-b2be5bb1e2e0.doc
+│   └── новый файл на основе доски.doc
+└── регламент.81e076aa-965d-4475-9c46-b2be5bb1e2e0.simple
 `
 
 // PreprocessGenerateTemplateRequest prepares data for template generation
@@ -203,7 +217,7 @@ func createFileHierarchyDescription(file models.File) string {
 	if file.IsEmpty() {
 		return ""
 	}
-	sb.WriteString(file.Name)
+	sb.WriteString(file.String())
 	if len(file.Children) > 0 {
 		sb.WriteString("\n")
 		writeFileTree(&sb, file.Children, "")
@@ -223,7 +237,7 @@ func writeFileTree(sb *strings.Builder, files []models.File, prefix string) {
 			branch = "└── "
 			childPrefix = prefix + "    "
 		}
-		sb.WriteString(prefix + branch + file.Name + "\n")
+		sb.WriteString(prefix + branch + file.String() + "\n")
 		if len(file.Children) > 0 {
 			writeFileTree(sb, file.Children, childPrefix)
 		}

@@ -20,26 +20,29 @@ func TestParseASCIITree_SimpleTree(t *testing.T) {
 
 func TestParseASCIITree_NestedTree(t *testing.T) {
 	asciiTree := `project
-    src
-        main.go
-        pkg
-            parser.go
-            lexer.go`
+    src.123.section
+        main.456.doc
+        pkg.789.section
+            parser1231.doc
+            lexer.wil`
 
 	hierarchy := ParseASCIITree(asciiTree)
 
 	assert.Greater(t, len(hierarchy.Nodes), 0, "should have nodes")
-	
+
+	// Check that we have proper parent-child relationships
 	nodeMap := make(map[string]string)
 	for _, node := range hierarchy.Nodes {
 		nodeMap[node.Name] = node.ID
 	}
-	
+
+	// Verify all nodes exist
 	assert.Contains(t, nodeMap, "project", "should have project node")
 	assert.Contains(t, nodeMap, "src", "should have src node")
-	assert.Contains(t, nodeMap, "main.go", "should have main.go node")
+	assert.Contains(t, nodeMap, "main", "should have main node")
 	assert.Contains(t, nodeMap, "pkg", "should have pkg node")
-	assert.Contains(t, nodeMap, "parser.go", "should have parser.go node")
+	assert.Contains(t, nodeMap, "parser1231", "should have parser node")
+	assert.Contains(t, nodeMap, "lexer", "should have lexer node")
 }
 
 func TestParseASCIITree_EmptyTree(t *testing.T) {
@@ -51,10 +54,10 @@ func TestParseASCIITree_EmptyTree(t *testing.T) {
 
 func TestParseASCIITree_DetectsFileTypes(t *testing.T) {
 	asciiTree := `project
-    src
-        main.go
-        utils.go
-    README.md`
+    src.section
+        main.12321.doc
+        utils.simple
+    README.12321.doc`
 
 	hierarchy := ParseASCIITree(asciiTree)
 
@@ -62,20 +65,23 @@ func TestParseASCIITree_DetectsFileTypes(t *testing.T) {
 		if node.Name == "src" {
 			assert.Equal(t, "section", node.Type, "src should be a section")
 		}
-		if node.Name == "main.go" {
+		if node.Name == "main" {
 			assert.Equal(t, "doc", node.Type, "main.go should be a doc")
 		}
-		if node.Name == "README.md" {
+		if node.Name == "utils" {
+			assert.Equal(t, "simple", node.Type, "utils.go should be a simple")
+		}
+		if node.Name == "README" {
 			assert.Equal(t, "doc", node.Type, "README.md should be a doc")
 		}
 	}
 }
 
 func TestToModelFile_ConvertsHierarchy(t *testing.T) {
-	asciiTree := `project
-    src
-        main.go
-        utils.go`
+	asciiTree := `project.section
+    src.section
+        main.12321.doc
+        utils.simple`
 
 	hierarchy := ParseASCIITree(asciiTree)
 	modelFile := ToModelFile(hierarchy)
