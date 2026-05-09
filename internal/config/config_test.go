@@ -322,7 +322,7 @@ func TestLoadFromEnv(t *testing.T) {
 		assert.Equal(t, "8080", cfg.Server.Port)
 		assert.Equal(t, "dev", cfg.Server.Env)
 		assert.Equal(t, 100, cfg.Job.QueueSize)
-		assert.Equal(t, 2, cfg.Job.WorkerCount)
+		assert.Equal(t, 10, cfg.Job.WorkerCount)
 	})
 
 	t.Run("loads custom environment values", func(t *testing.T) {
@@ -485,8 +485,8 @@ func TestLoadFromEnvAllDefaults(t *testing.T) {
 	assert.Equal(t, 2*time.Minute, cfg.LLM.Timeout)
 
 	assert.Equal(t, 100, cfg.Job.QueueSize)
-	assert.Equal(t, 2, cfg.Job.WorkerCount)
-	assert.Equal(t, 1, cfg.Job.DbWorkerCount)
+	assert.Equal(t, 10, cfg.Job.WorkerCount)
+	assert.Equal(t, 2, cfg.Job.DbWorkerCount)
 	assert.Equal(t, 3, cfg.Job.MaxRetries)
 
 	assert.Equal(t, 5*time.Minute, cfg.Timeouts.SyncProcess)
