@@ -155,7 +155,7 @@ func TestJsonFormatterIntegration(t *testing.T) {
 	formatter := JsonFormatter{w: buf}
 
 	// Create a map to marshal as JSON
-	data := map[string]interface{}{
+	data := map[string]any{
 		"level":   "info",
 		"msg":     "test message",
 		"time":    "2024-01-01T00:00:00Z",
@@ -170,7 +170,7 @@ func TestJsonFormatterIntegration(t *testing.T) {
 	assert.Greater(t, n, 0)
 
 	output := buf.String()
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal([]byte(output), &result)
 	assert.NoError(t, err)
 }
@@ -193,7 +193,7 @@ func TestJsonFormatterWriteLargeJSON(t *testing.T) {
 	assert.Greater(t, n, len(jsonBytes))
 
 	output := buf.String()
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal([]byte(output), &result)
 	assert.NoError(t, err)
 	assert.Equal(t, 100, len(result))

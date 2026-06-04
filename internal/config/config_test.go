@@ -364,10 +364,6 @@ func TestLoadFromEnv(t *testing.T) {
 		cfg := LoadFromEnv()
 
 		assert.Equal(t, "sqlite", cfg.Database.Type)
-		assert.Equal(t, "db.example.com", cfg.Database.Host)
-		assert.Equal(t, "5432", cfg.Database.Port)
-		assert.Equal(t, "mydb", cfg.Database.Name)
-		assert.Equal(t, "/data/mydb.db", cfg.Database.FilePath)
 	})
 
 	t.Run("loads timeouts configuration", func(t *testing.T) {
@@ -380,18 +376,6 @@ func TestLoadFromEnv(t *testing.T) {
 		assert.Equal(t, 10*time.Minute, cfg.Timeouts.SyncProcess)
 		assert.Equal(t, 3*time.Minute, cfg.Timeouts.InkRecognize)
 		assert.Equal(t, 5*time.Minute, cfg.Timeouts.LLMRequest)
-	})
-
-	t.Run("loads s3 configuration", func(t *testing.T) {
-		os.Setenv("S3_BUCKET_NAME", "my-bucket")
-		os.Setenv("S3_ENDPOINT", "https://s3.custom.com")
-		os.Setenv("S3_REGION", "us-west-2")
-
-		cfg := LoadFromEnv()
-
-		assert.Equal(t, "my-bucket", cfg.S3.BucketName)
-		assert.Equal(t, "https://s3.custom.com", cfg.S3.Endpoint)
-		assert.Equal(t, "us-west-2", cfg.S3.Region)
 	})
 
 	t.Run("loads LLM timeouts", func(t *testing.T) {
@@ -426,22 +410,6 @@ func TestLoadFromEnv(t *testing.T) {
 		assert.Equal(t, 5, cfg.Job.MaxRetries)
 		assert.Equal(t, 5*time.Second, cfg.Job.RetryBackoff)
 	})
-
-	t.Run("loads db debug flag", func(t *testing.T) {
-		os.Setenv("DB_DEBUG", "true")
-
-		cfg := LoadFromEnv()
-
-		assert.True(t, cfg.Database.Debug)
-	})
-
-	t.Run("db debug flag defaults to false", func(t *testing.T) {
-		os.Unsetenv("DB_DEBUG")
-
-		cfg := LoadFromEnv()
-
-		assert.False(t, cfg.Database.Debug)
-	})
 }
 
 func TestLoadFromEnvAllDefaults(t *testing.T) {
@@ -451,8 +419,7 @@ func TestLoadFromEnvAllDefaults(t *testing.T) {
 		"LLM_API_KEY", "LLM_TIMEOUT", "PORT", "ENV", "VERIFICATION_KEY",
 		"JOB_QUEUE_SIZE", "JOB_WORKERS", "DB_JOB_WORKERS", "JOB_MAX_RETRIES", "JOB_RETRY_BACKOFF",
 		"TIMEOUT_SYNC_PROCESS", "TIMEOUT_INK_RECOGNIZE", "TIMEOUT_LLM_REQUEST",
-		"DB_TYPE", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DB_SSL_MODE",
-		"SQLITE_FILE_PATH", "DB_DEBUG", "S3_BUCKET_NAME", "S3_ENDPOINT", "S3_REGION",
+		"DB_TYPE",
 	}
 
 	originalEnv := make(map[string]string)
@@ -494,11 +461,4 @@ func TestLoadFromEnvAllDefaults(t *testing.T) {
 	assert.Equal(t, 2*time.Minute, cfg.Timeouts.LLMRequest)
 
 	assert.Equal(t, "memory", cfg.Database.Type)
-	assert.Equal(t, "localhost", cfg.Database.Host)
-	assert.Equal(t, "5432", cfg.Database.Port)
-	assert.Equal(t, "aiservice", cfg.Database.Name)
-
-	assert.Equal(t, "foggy", cfg.S3.BucketName)
-	assert.Equal(t, "https://storage.yandexcloud.net", cfg.S3.Endpoint)
-	assert.Equal(t, "ru-central1", cfg.S3.Region)
 }

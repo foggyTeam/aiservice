@@ -56,7 +56,7 @@ func newImageDownloadStep() Step {
 		}
 
 		// Download image only for Ollama provider (local model)
-		// For remote providers (Gemini, Yandex), use URL directly
+		// For remote providers use URL directly
 		if state.Provider == "ollama" {
 			downloadResult, err := imageService.DownloadImage(ctx, imageURL)
 			if err != nil {

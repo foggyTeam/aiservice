@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestFilter_WithIntegers tests Filter with integer values
 func TestFilter_WithIntegers(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	result := Filter(input, func(x int) bool {
@@ -19,7 +18,6 @@ func TestFilter_WithIntegers(t *testing.T) {
 	assert.Equal(t, expected, result, "Filter should return only even numbers")
 }
 
-// TestFilter_WithStrings tests Filter with string values
 func TestFilter_WithStrings(t *testing.T) {
 	input := []string{"apple", "apricot", "banana", "blueberry", "cherry"}
 	result := Filter(input, func(s string) bool {
@@ -30,7 +28,6 @@ func TestFilter_WithStrings(t *testing.T) {
 	assert.Equal(t, expected, result, "Filter should return only strings starting with 'a'")
 }
 
-// TestFilter_EmptySlice tests Filter with empty input slice
 func TestFilter_EmptySlice(t *testing.T) {
 	input := []int{}
 	result := Filter(input, func(x int) bool {
@@ -41,7 +38,6 @@ func TestFilter_EmptySlice(t *testing.T) {
 	assert.Equal(t, 0, len(result), "Result should have length 0")
 }
 
-// TestFilter_NoMatches tests Filter when no elements match predicate
 func TestFilter_NoMatches(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
 	result := Filter(input, func(x int) bool {
@@ -52,7 +48,6 @@ func TestFilter_NoMatches(t *testing.T) {
 	assert.Equal(t, 0, len(result), "Result should have length 0")
 }
 
-// TestFilter_AllMatch tests Filter when all elements match predicate
 func TestFilter_AllMatch(t *testing.T) {
 	input := []int{2, 4, 6, 8, 10}
 	result := Filter(input, func(x int) bool {
@@ -63,7 +58,6 @@ func TestFilter_AllMatch(t *testing.T) {
 	assert.Equal(t, len(input), len(result), "Result should have same length as input")
 }
 
-// TestFilter_SingleElement tests Filter with single element slice
 func TestFilter_SingleElement(t *testing.T) {
 	input := []int{5}
 	result := Filter(input, func(x int) bool {
@@ -79,7 +73,6 @@ func TestFilter_SingleElement(t *testing.T) {
 	assert.Equal(t, []int{}, result2, "Filter should return empty slice if single element doesn't match")
 }
 
-// TestFilter_WithComplexObjects tests Filter with custom struct types
 func TestFilter_WithComplexObjects(t *testing.T) {
 	type Person struct {
 		Name string
@@ -104,7 +97,6 @@ func TestFilter_WithComplexObjects(t *testing.T) {
 	assert.Equal(t, expected, result, "Filter should correctly filter complex objects")
 }
 
-// TestFilter_PreservesOrder tests that Filter preserves element order
 func TestFilter_PreservesOrder(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	result := Filter(input, func(x int) bool {
@@ -114,7 +106,6 @@ func TestFilter_PreservesOrder(t *testing.T) {
 	assert.Equal(t, []int{2, 4, 6, 8}, result, "Filter should preserve order of matched elements")
 }
 
-// TestFilter_WithBoolean tests Filter with boolean values
 func TestFilter_WithBoolean(t *testing.T) {
 	input := []bool{true, false, true, true, false, false, true}
 	result := Filter(input, func(b bool) bool {
@@ -125,7 +116,6 @@ func TestFilter_WithBoolean(t *testing.T) {
 	assert.Equal(t, expected, result, "Filter should correctly filter boolean values")
 }
 
-// TestFilter_WithNegativePredicate tests Filter with inverted predicate
 func TestFilter_WithNegativePredicate(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
 	result := Filter(input, func(x int) bool {
@@ -136,7 +126,6 @@ func TestFilter_WithNegativePredicate(t *testing.T) {
 	assert.Equal(t, expected, result, "Filter should work with negative conditions")
 }
 
-// TestFilter_DoesNotModifyOriginal tests that Filter doesn't modify original slice
 func TestFilter_DoesNotModifyOriginal(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
 	inputCopy := make([]int, len(input))
@@ -149,7 +138,6 @@ func TestFilter_DoesNotModifyOriginal(t *testing.T) {
 	assert.Equal(t, inputCopy, input, "Filter should not modify the original slice")
 }
 
-// TestMap_WithIntegers tests Map with integer transformation
 func TestMap_WithIntegers(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
 	result := Map(input, func(x int) int {
@@ -160,7 +148,6 @@ func TestMap_WithIntegers(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should double all integers")
 }
 
-// TestMap_WithStringTransformation tests Map with string transformation
 func TestMap_WithStringTransformation(t *testing.T) {
 	input := []string{"hello", "world", "go"}
 	result := Map(input, func(s string) string {
@@ -171,7 +158,6 @@ func TestMap_WithStringTransformation(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should convert strings to uppercase")
 }
 
-// TestMap_IntToString tests Map converting from int to string
 func TestMap_IntToString(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
 	result := Map(input, func(x int) string {
@@ -182,7 +168,6 @@ func TestMap_IntToString(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should convert integers to strings")
 }
 
-// TestMap_StringToInt tests Map converting from string to int
 func TestMap_StringToInt(t *testing.T) {
 	input := []string{"1", "2", "3", "4", "5"}
 	result := Map(input, func(s string) int {
@@ -194,7 +179,6 @@ func TestMap_StringToInt(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should convert strings to integers")
 }
 
-// TestMap_EmptySlice tests Map with empty input slice
 func TestMap_EmptySlice(t *testing.T) {
 	input := []int{}
 	result := Map(input, func(x int) int {
@@ -205,7 +189,6 @@ func TestMap_EmptySlice(t *testing.T) {
 	assert.Equal(t, 0, len(result), "Result should have length 0")
 }
 
-// TestMap_SingleElement tests Map with single element slice
 func TestMap_SingleElement(t *testing.T) {
 	input := []int{42}
 	result := Map(input, func(x int) int {
@@ -215,7 +198,6 @@ func TestMap_SingleElement(t *testing.T) {
 	assert.Equal(t, []int{84}, result, "Map should correctly transform single element")
 }
 
-// TestMap_WithComplexObjects tests Map with custom struct types
 func TestMap_WithComplexObjects(t *testing.T) {
 	type Person struct {
 		Name string
@@ -236,7 +218,6 @@ func TestMap_WithComplexObjects(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should extract names from persons")
 }
 
-// TestMap_WithStructExtraction tests Map extracting multiple fields
 func TestMap_WithStructExtraction(t *testing.T) {
 	type Item struct {
 		ID    int
@@ -261,7 +242,6 @@ func TestMap_WithStructExtraction(t *testing.T) {
 	}
 }
 
-// TestMap_PreservesOrder tests that Map preserves element order
 func TestMap_PreservesOrder(t *testing.T) {
 	input := []int{5, 1, 3, 9, 2}
 	result := Map(input, func(x int) int {
@@ -272,7 +252,6 @@ func TestMap_PreservesOrder(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should preserve order of elements")
 }
 
-// TestMap_ToBoolean tests Map converting to boolean
 func TestMap_ToBoolean(t *testing.T) {
 	input := []int{0, 1, 2, 0, 5}
 	result := Map(input, func(x int) bool {
@@ -283,7 +262,6 @@ func TestMap_ToBoolean(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should convert integers to booleans correctly")
 }
 
-// TestMap_DoesNotModifyOriginal tests that Map doesn't modify original slice
 func TestMap_DoesNotModifyOriginal(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
 	inputCopy := make([]int, len(input))
@@ -296,7 +274,6 @@ func TestMap_DoesNotModifyOriginal(t *testing.T) {
 	assert.Equal(t, inputCopy, input, "Map should not modify the original slice")
 }
 
-// TestMap_WithFloatRounding tests Map with float rounding
 func TestMap_WithFloatRounding(t *testing.T) {
 	input := []float64{1.4, 1.5, 2.6, 3.1}
 	result := Map(input, func(f float64) int {
@@ -307,7 +284,6 @@ func TestMap_WithFloatRounding(t *testing.T) {
 	assert.Equal(t, expected, result, "Map should round floats to integers")
 }
 
-// TestFilterAndMapCombined tests using Filter and Map together
 func TestFilterAndMapCombined(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 
@@ -323,7 +299,6 @@ func TestFilterAndMapCombined(t *testing.T) {
 	assert.Equal(t, expected, result, "Combined Filter and Map should work correctly")
 }
 
-// TestMap_LargeSlice tests Map performance with larger slices
 func TestMap_LargeSlice(t *testing.T) {
 	input := make([]int, 1000)
 	for i := 0; i < 1000; i++ {
@@ -339,7 +314,6 @@ func TestMap_LargeSlice(t *testing.T) {
 	assert.Equal(t, 1998, result[999], "Last element should be 1998")
 }
 
-// TestFilter_LargeSlice tests Filter performance with larger slices
 func TestFilter_LargeSlice(t *testing.T) {
 	input := make([]int, 1000)
 	for i := 0; i < 1000; i++ {

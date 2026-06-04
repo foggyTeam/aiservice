@@ -28,7 +28,6 @@ type JobQueueService struct {
 }
 
 //go:generate mockgen -source=$GOFILE -destination=../mocks/mock_$GOFILE -package=mocks
-
 type JobStorage interface {
 	Save(job models.Job) error
 	Get(id string) (models.Job, error)

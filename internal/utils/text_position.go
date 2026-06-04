@@ -33,10 +33,7 @@ func CalculateTextSize(content string) (width, height float32) {
 	charsPerLine := 50
 	lineHeight := float32(20.0)
 
-	numLines := int(math.Ceil(float64(len(content)) / float64(charsPerLine)))
-	if numLines < 1 {
-		numLines = 1
-	}
+	numLines := max(int(math.Ceil(float64(len(content)) / float64(charsPerLine))), 1)
 
 	width = float32(charsPerLine * 8)
 	height = float32(numLines) * lineHeight

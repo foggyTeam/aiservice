@@ -13,19 +13,12 @@ type Config struct {
 	Job      JobConfig
 	Timeouts TimeoutsConfig
 	Database DatabaseConfig
-	S3       S3Config
 }
 
 type ServerConfig struct {
 	Port            string
 	Env             string // "dev", "prod"
 	VerificationKey string // API key for authentication
-}
-
-type S3Config struct {
-	BucketName string
-	Endpoint   string
-	Region     string
 }
 
 type LLMProviderConfig struct {
@@ -74,15 +67,7 @@ type TimeoutsConfig struct {
 }
 
 type DatabaseConfig struct {
-	Type     string // "memory", "sqlite"
-	Host     string
-	Port     string
-	Name     string
-	User     string
-	Password string
-	SSLMode  string
-	FilePath string // For SQLite
-	Debug    bool   // Enable SQL logging
+	Type string // "memory", "sqlite"
 }
 
 func LoadFromEnv() *Config {
@@ -132,20 +117,7 @@ func LoadFromEnv() *Config {
 			LLMRequest:   getDurationEnv("TIMEOUT_LLM_REQUEST", 2*time.Minute),
 		},
 		Database: DatabaseConfig{
-			Type:     getEnv("DB_TYPE", "memory"), // Default to memory for backward compatibility
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			Name:     getEnv("DB_NAME", "aiservice"),
-			User:     getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", ""),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
-			FilePath: getEnv("SQLITE_FILE_PATH", "./aiservice.db"), // Default SQLite file path
-			Debug:    getEnv("DB_DEBUG", "false") == "true",
-		},
-		S3: S3Config{
-			BucketName: getEnv("S3_BUCKET_NAME", "foggy"),
-			Endpoint:   getEnv("S3_ENDPOINT", "https://storage.yandexcloud.net"),
-			Region:     getEnv("S3_REGION", "ru-central1"),
+			Type: getEnv("DB_TYPE", "memory"),
 		},
 	}
 }

@@ -91,9 +91,6 @@ type TemplateEdge struct {
 	Label  string `json:"label,omitempty" jsonschema:"description=Метка/описание связи"`
 }
 
-// For structurize, we'll define a flow that doesn't use the recursive File structure in its definition
-// to avoid schema generation issues, but the LLM will be instructed to return the proper structure
-
 // FileNode represents a single node in the file hierarchy for schema generation
 // This avoids infinite recursion during JSON schema generation
 type FileNode struct {
