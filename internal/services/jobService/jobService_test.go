@@ -115,28 +115,6 @@ func makeTestJob(id, requestType string) models.Job {
 	}
 }
 
-func waitForJobCompletion(t *testing.T, q *JobQueueService, jobID string, timeout time.Duration) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			t.Fatalf("timeout waiting for job %s to complete", jobID)
-		case <-ticker.C:
-			resp, found, _ := q.GetJobResponse(jobID)
-			if found {
-				_ = resp
-				return
-			}
-		}
-	}
-}
-
 func TestNewJob_GeneratesUniqueID(t *testing.T) {
 	t.Parallel()
 

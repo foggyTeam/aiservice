@@ -6,7 +6,6 @@ import (
 
 	"github.com/aiservice/internal/models"
 	"github.com/aiservice/internal/providers"
-	"github.com/aiservice/internal/services/image"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,15 +69,6 @@ type mockDigitalInkRecognizer struct {
 
 func (m *mockDigitalInkRecognizer) RecognizeInk(ctx context.Context, elements []models.Element) (string, error) {
 	return m.recognizeResp, m.recognizeErr
-}
-
-type mockImageService struct {
-	downloadResult *image.DownloadResult
-	downloadErr    error
-}
-
-func (m *mockImageService) DownloadImage(ctx context.Context, url string) (*image.DownloadResult, error) {
-	return m.downloadResult, m.downloadErr
 }
 
 func TestExtractLineElements(t *testing.T) {
@@ -228,13 +218,14 @@ func TestNewBoardTextExtractionStep(t *testing.T) {
 				},
 			}
 
-			if tt.requestType == models.SummarizeType {
+			switch tt.requestType {
+			case models.SummarizeType:
 				state.AnalyzeRequest.SummarizeRequest = models.SummarizeRequest{
 					Board: models.Board{
 						Elements: tt.boardElements,
 					},
 				}
-			} else if tt.requestType == models.StructurizeType {
+			case models.StructurizeType:
 				state.AnalyzeRequest.StructurizeRequest = models.StructurizeRequest{
 					Board: models.Board{
 						Elements: tt.boardElements,

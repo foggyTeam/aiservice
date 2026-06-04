@@ -30,17 +30,9 @@ var graphPreprocessor = graph.NewGraphPreprocessor()
 // ImageService for downloading and cleaning up images
 var imageService *image.Service
 
-// LLM client for incremental full rescan
-var llmForIncremental providers.LLMClient
-
 // SetImageService sets the image service for the pipeline
 func SetImageService(svc *image.Service) {
 	imageService = svc
-}
-
-// SetLLMForIncremental sets the LLM client for incremental full rescan
-func SetLLMForIncremental(llm providers.LLMClient) {
-	llmForIncremental = llm
 }
 
 // SetDigitalInkClient sets the digital ink client for the pipeline

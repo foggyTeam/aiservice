@@ -401,13 +401,13 @@ func runRequestGenerator() {
 	}
 
 	generators := []func() error{
-		// generator(gen.GenerateSummarize, LightConfig(), 10, "summarize_light"),
-		// generator(gen.GenerateStructurize, LightConfig(), 10, "structurize_light"),
-		// generator(gen.GenerateTemplate, LightConfig(), 10, "template_light"),
+		generator(gen.GenerateSummarize, LightConfig(), 10, "summarize_light"),
+		generator(gen.GenerateStructurize, LightConfig(), 10, "structurize_light"),
+		generator(gen.GenerateTemplate, LightConfig(), 10, "template_light"),
 
-		// generator(gen.GenerateSummarize, DefaultConfig(), 5, "summarize_default"),
-		// generator(gen.GenerateStructurize, DefaultConfig(), 5, "structurize_default"),
-		// generator(gen.GenerateTemplate, DefaultConfig(), 5, "template_default"),
+		generator(gen.GenerateSummarize, DefaultConfig(), 5, "summarize_default"),
+		generator(gen.GenerateStructurize, DefaultConfig(), 5, "structurize_default"),
+		generator(gen.GenerateTemplate, DefaultConfig(), 5, "template_default"),
 
 		generator(gen.GenerateSummarize, HeavyConfig(), 200, "summarize_heavy"),
 		generator(gen.GenerateStructurize, HeavyConfig(), 200, "structurize_heavy"),
@@ -426,10 +426,10 @@ func generator[T any](generate func(cfg Config) (T, error), cfg Config, count in
 		for i := range count {
 			req, err := generate(cfg)
 			if err != nil {
-				return fmt.Errorf("failed to generate %s %d: %v\n", prefix, i, err)
+				return fmt.Errorf("failed to generate %s %d: %v", prefix, i, err)
 			}
 			if err := SaveToFile(req, fmt.Sprintf("request_fixtures/%s_%d.json", prefix, i)); err != nil {
-				return fmt.Errorf("failed to save %s %d: %v\n", prefix, i, err)
+				return fmt.Errorf("failed to save %s %d: %v", prefix, i, err)
 			}
 		}
 		return nil

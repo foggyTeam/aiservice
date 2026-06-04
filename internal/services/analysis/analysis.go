@@ -137,7 +137,6 @@ func (s *AnalysisService) StartJob(ctx context.Context, req models.AnalyzeReques
 func (s *AnalysisService) Process(ctx context.Context, req models.AnalyzeRequest) (models.AnalyzeResponse, error) {
 	// Set services in pipeline
 	pipeline.SetImageService(s.imageService)
-	pipeline.SetLLMForIncremental(s.llm)
 	pipeline.SetDigitalInkClient(s.digitalInkClient)
 
 	// Handle Session for Summarize and Structurize

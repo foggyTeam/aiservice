@@ -55,7 +55,7 @@ func setCompletedResponses(q *jobservice.JobQueueService, responses map[string]m
 	reflect.NewAt(rv.Type(), unsafe.Pointer(rv.UnsafeAddr())).Elem().Set(reflect.ValueOf(responses))
 }
 
-func newEchoContext(t *testing.T, method, target string, body []byte) (echo.Context, *httptest.ResponseRecorder) {
+func newEchoContext(t *testing.T, method, target string, _ []byte) (echo.Context, *httptest.ResponseRecorder) {
 	t.Helper()
 	e := echo.New()
 	req := httptest.NewRequest(method, target, nil)
